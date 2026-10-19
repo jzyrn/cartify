@@ -126,11 +126,13 @@ const Dashboard = () => {
         <>
             <MetaData title={'Admin Dashboard'} />
             <div className="row">
-                <div className="col-12 col-md-2">
+                {/* flex column lets the sidebar (flex: 1) stretch to the full height of the page */}
+                <div className="col-12 col-md-2" style={{ display: 'flex', flexDirection: 'column' }}>
                     <Sidebar />
                 </div>
 
-                <div className="col-12 col-md-10">
+                {/* min-width: 0 stops wide charts from causing a horizontal scrollbar */}
+                <div className="col-12 col-md-10" style={{ minWidth: 0 }}>
                     <Box sx={{ py: 2, pr: { md: 2 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
                         {/* Welcome banner */}
                         <Box

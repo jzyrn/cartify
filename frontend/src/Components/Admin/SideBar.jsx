@@ -49,9 +49,9 @@ const Sidebar = () => {
                 borderRadius: 3,
                 p: 2,
                 mt: 2,
+                mb: 2,
+                flex: 1,                      // grows to fill the column, so no white gap below
                 minHeight: { md: '78vh' },
-                position: { md: 'sticky' },
-                top: { md: 16 },
                 display: 'flex',
                 flexDirection: 'column',
             }}
