@@ -85,10 +85,13 @@ const orderSchema = mongoose.Schema({
         required: true,
         default: 0.0
     },
+    // Pending (customer can still cancel) -> Preparing -> Shipped -> Delivered
+    // Cancelled is only reachable from Pending
     orderStatus: {
         type: String,
         required: true,
-        default: 'Processing'
+        enum: ['Pending', 'Preparing', 'Shipped', 'Delivered', 'Cancelled'],
+        default: 'Pending'
     },
     deliveredAt: {
         type: Date

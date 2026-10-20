@@ -12,6 +12,10 @@ const fail = (res, error, status) => {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+// order flow: Pending -> Preparing -> Shipped -> Delivered
+// Cancelled is a side exit, only reachable from Pending (by the customer)
+const ADMIN_STATUSES = ['Pending', 'Preparing', 'Shipped', 'Delivered']
+
 // POST /order/new
 exports.newOrder = async (req, res) => {
     try {
@@ -21,6 +25,7 @@ exports.newOrder = async (req, res) => {
             return fail(res, 'No order items', 400)
         }
 
+        // orderStatus is not taken from the body, the model default ('Pending') is used
         const order = await Order.create({
             orderItems,
             shippingInfo,
@@ -69,11 +74,42 @@ exports.myOrders = async (req, res) => {
     }
 }
 
+// PUT /order/:id/cancel   (owner only, and only while the order is still Pending)
+exports.cancelOrder = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id)
+
+        if (!order) {
+            return fail(res, 'No order found with this ID', 404)
+        }
+
+        if (String(order.user) !== String(req.user._id)) {
+            return fail(res, 'You are not allowed to cancel this order', 403)
+        }
+
+        if (order.orderStatus !== 'Pending') {
+            return fail(res, 'This order can no longer be cancelled', 400)
+        }
+
+        // stock is only reduced on delivery, so there is nothing to put back here
+        order.orderStatus = 'Cancelled'
+        await order.save()
+
+        res.status(200).json({ success: true })
+    } catch (error) {
+        fail(res, error)
+    }
+}
+
 // GET /admin/orders
 exports.allOrders = async (req, res) => {
     try {
         const orders = await Order.find().sort({ createdAt: -1 })
-        const totalAmount = orders.reduce((acc, order) => acc + order.totalPrice, 0)
+
+        // cancelled orders are not counted as revenue
+        const totalAmount = orders
+            .filter(order => order.orderStatus !== 'Cancelled')
+            .reduce((acc, order) => acc + order.totalPrice, 0)
 
         res.status(200).json({ success: true, totalAmount, orders })
     } catch (error) {
@@ -94,8 +130,12 @@ exports.updateOrder = async (req, res) => {
             return fail(res, 'This order has already been delivered', 400)
         }
 
+        if (order.orderStatus === 'Cancelled') {
+            return fail(res, 'This order was cancelled by the customer', 400)
+        }
+
         const { status } = req.body
-        if (!['Processing', 'Shipped', 'Delivered'].includes(status)) {
+        if (!ADMIN_STATUSES.includes(status)) {
             return fail(res, 'Please choose a valid status', 400)
         }
 
@@ -143,6 +183,7 @@ exports.deleteOrder = async (req, res) => {
 exports.salesPerMonth = async (req, res) => {
     try {
         const data = await Order.aggregate([
+            { $match: { orderStatus: { $ne: 'Cancelled' } } },
             {
                 $group: {
                     _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
@@ -167,6 +208,7 @@ exports.salesPerMonth = async (req, res) => {
 exports.productSales = async (req, res) => {
     try {
         const rows = await Order.aggregate([
+            { $match: { orderStatus: { $ne: 'Cancelled' } } },
             { $unwind: '$orderItems' },
             {
                 $group: {
@@ -194,6 +236,7 @@ exports.productSales = async (req, res) => {
 exports.customerSales = async (req, res) => {
     try {
         const customerSales = await Order.aggregate([
+            { $match: { orderStatus: { $ne: 'Cancelled' } } },
             { $group: { _id: '$user', total: { $sum: '$totalPrice' } } },
             { $sort: { total: -1 } },
             { $limit: 10 },
