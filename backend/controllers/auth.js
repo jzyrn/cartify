@@ -138,6 +138,12 @@ exports.facebookLogin = async (req, res) => {
             `${GRAPH}/me?fields=id,name,email,picture.type(large)&access_token=${token}`
         ).then(r => r.json())
 
+        // ---- TEMPORARY DEBUG LOGS: remove once the email problem is solved ----
+        console.log('FB profile:', profile)
+        const perms = await fetch(`${GRAPH}/me/permissions?access_token=${token}`).then(r => r.json())
+        console.log('FB permissions:', JSON.stringify(perms))
+        // -----------------------------------------------------------------------
+
         if (profile.error) {
             return res.status(401).json({ success: false, message: 'Invalid Facebook sign-in' })
         }

@@ -143,6 +143,17 @@ const Login = () => {
         }
     }, [error, isAuthenticated, dispatch, navigate, redirect])
 
+    // shows a message when a protected page sent the visitor here
+    // (kept after the effect above so its message is the one that stays on screen)
+    useEffect(() => {
+        const params = new URLSearchParams(location.search)
+        if (params.get('reason') === 'unauthorized') {
+            setLoginError('Unauthorized access. Please sign in to continue.')
+            // remove the param so a refresh doesn't show the message again
+            navigate('/login', { replace: true })
+        }
+    }, [location.search, navigate])
+
     const facebookButton = (onClick) => (
         <Button
             variant="outlined"
@@ -282,7 +293,7 @@ const Login = () => {
                                             onFail={(err) => {
                                                 console.error('Facebook login failed:', err)
                                                 setLoginError(`Facebook sign-in failed (${err?.status || 'unknown'}).`)
-                                                }}
+                                            }}
                                             render={({ onClick }) => facebookButton(onClick)}
                                         />
                                     ) : (

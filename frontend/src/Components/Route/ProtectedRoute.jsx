@@ -11,12 +11,14 @@ const ProtectedRoute = ({ children, isAdmin = false }) => {
         return <Loader />
     }
 
+    // not logged in: the login page reads ?reason=unauthorized and shows the message
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />
+        return <Navigate to="/login?reason=unauthorized" replace />
     }
 
+    // logged in but not an admin
     if (isAdmin === true && user?.role !== 'admin') {
-        return <Navigate to="/" replace />
+        return <Navigate to="/?reason=unauthorized" replace />
     }
 
     return children
