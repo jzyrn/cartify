@@ -1,30 +1,26 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useFormik } from 'formik'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Box, Button, Paper, TextField, Typography } from '@mui/material'
+import { Autocomplete, Box, Button, CircularProgress, MenuItem, Paper, TextField, Typography } from '@mui/material'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
 import { AdminLayout, PageHeader, primaryBtnSx, fieldSx, cardSx, GREEN, GOLD } from './AdminUI'
-import { updateProduct, getProductDetails, clearErrors } from '../../actions/productActions'
+import { updateProduct, getProductDetails, getAdminProducts, clearErrors } from '../../actions/productActions'
 import { UPDATE_PRODUCT_RESET } from '../../constants/productConstants'
 import { productSchema } from '../../validation/schemas'
 
 const categories = [
-    'Electronics',
-    'Cameras',
-    'Laptops',
-    'Accessories',
-    'Headphones',
-    'Food',
-    'Books',
-    'Clothes/Shoes',
-    'Beauty/Health',
-    'Sports',
-    'Outdoor',
-    'Home'
+    'Foundation',
+    'Concealer',
+    'Powder',
+    'Blush & Highlighter',
+    'Eyeshadow',
+    'Eyeliner & Mascara',
+    'Lipstick & Lip Tint',
+    'Brows'
 ]
 
 const thumbSx = { width: 72, height: 72, objectFit: 'cover', borderRadius: 2, border: '1px solid #e3e9e5' }
@@ -33,6 +29,13 @@ const UpdateProduct = () => {
     const dispatch = useDispatch()
     const { error, product } = useSelector(state => state.productDetails)
     const { loading, error: updateError, isUpdated } = useSelector(state => state.product)
+    const { products = [] } = useSelector(state => state.products)
+
+    // brand options come from the products that already exist
+    const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort()
+
+    // becomes true once the seller is typed by hand, so the brand stops overwriting it
+    const sellerEdited = useRef(false)
 
     const [images, setImages] = useState([])
     const [oldImages, setOldImages] = useState([])
@@ -51,17 +54,19 @@ const UpdateProduct = () => {
             description: product?.description || '',
             category: product?.category || '',
             stock: product?.stock ?? '',
-            seller: product?.seller || '',
+            brand: product?.brand || '',
+            // the seller defaults to the product's brand
+            seller: product?.brand || product?.seller || '',
         },
         enableReinitialize: true,
         validationSchema: productSchema,
         onSubmit: (values) => {
-        const formData = new FormData()
-        Object.entries(values).forEach(([key, value]) => formData.set(key, value))
-        images.forEach(image => {
-            formData.append('images', image)
-        })
-        dispatch(updateProduct(product._id, formData))
+            const formData = new FormData()
+            Object.entries(values).forEach(([key, value]) => formData.set(key, value))
+            images.forEach(image => {
+                formData.append('images', image)
+            })
+            dispatch(updateProduct(product._id, formData))
         },
     })
 
@@ -83,6 +88,10 @@ const UpdateProduct = () => {
     }
 
     useEffect(() => {
+        dispatch(getAdminProducts())
+    }, [dispatch])
+
+    useEffect(() => {
         if (product && product._id !== id) {
             dispatch(getProductDetails(id))
         } else if (product) {
@@ -96,12 +105,16 @@ const UpdateProduct = () => {
             errMsg(updateError)
             dispatch(clearErrors())
         }
+    }, [error, updateError, product, id])
+
+    // runs once the update finished: success message, reset the flag, back to the list
+    useEffect(() => {
         if (isUpdated) {
-            navigate('/admin/products')
             successMsg('Product updated successfully')
             dispatch({ type: UPDATE_PRODUCT_RESET })
+            navigate('/admin/products')
         }
-    }, [error, updateError, product, id, isUpdated])
+    }, [isUpdated])
 
     return (
         <>
@@ -140,19 +153,46 @@ const UpdateProduct = () => {
                             id="category_field"
                             label="Category"
                             select
-                            SelectProps={{ native: true }}
-                            InputLabelProps={{ shrink: true }}
+                            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
                             {...formik.getFieldProps('category')}
                             error={formik.touched.category && Boolean(formik.errors.category)}
                             helperText={formik.touched.category && formik.errors.category}
                             sx={fieldSx}
                         >
+                            <MenuItem value="" disabled>Select a category</MenuItem>
                             {categories.map(category => (
-                                <option key={category} value={category}>{category}</option>
+                                <MenuItem key={category} value={category}>{category}</MenuItem>
                             ))}
                         </TextField>
-                        <TextField id="seller_field" label="Seller Name" {...formik.getFieldProps('seller')} error={formik.touched.seller && Boolean(formik.errors.seller)} helperText={formik.touched.seller && formik.errors.seller} sx={fieldSx} />
+
+                        {/* picking a brand also fills the seller, unless the seller was typed by hand */}
+                        <Autocomplete
+                            freeSolo
+                            options={brands}
+                            inputValue={formik.values.brand}
+                            onInputChange={(e, value) => {
+                                formik.setFieldValue('brand', value)
+                                if (!sellerEdited.current) formik.setFieldValue('seller', value)
+                            }}
+                            renderInput={(params) => (
+                                <TextField {...params} id="brand_field" label="Brand" sx={fieldSx} />
+                            )}
+                        />
                     </Box>
+
+                    <TextField
+                        id="seller_field"
+                        label="Seller Name"
+                        {...formik.getFieldProps('seller')}
+                        onChange={(e) => {
+                            sellerEdited.current = true
+                            formik.handleChange(e)
+                        }}
+                        error={formik.touched.seller && Boolean(formik.errors.seller)}
+                        helperText={formik.touched.seller && formik.errors.seller}
+                        fullWidth
+                        sx={fieldSx}
+                    />
 
                     <Box>
                         <Typography variant="body2" fontWeight={600} sx={{ color: GREEN, mb: 1 }}>Images</Typography>
@@ -174,8 +214,15 @@ const UpdateProduct = () => {
                         </Box>
                     </Box>
 
-                    <Button type="submit" fullWidth size="large" disableElevation disabled={loading ? true : false} sx={primaryBtnSx}>
-                        Update
+                    <Button type="submit" fullWidth size="large" disableElevation disabled={Boolean(loading)} sx={primaryBtnSx}>
+                        {loading ? (
+                            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
+                                <CircularProgress size={18} sx={{ color: GOLD }} />
+                                Updating...
+                            </Box>
+                        ) : (
+                            'Update'
+                        )}
                     </Button>
                 </Paper>
             </AdminLayout>
