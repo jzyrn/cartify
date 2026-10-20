@@ -14,6 +14,12 @@ import Home from './Components/Home'
 import ProductDetails from './Components/Product/ProductDetails'
 import Cart from './Components/Cart/Cart'
 
+// Checkout
+import Shipping from './Components/Cart/Shipping'
+import ConfirmOrder from './Components/Cart/ConfirmOrder'
+import Payment from './Components/Cart/Payment'
+import OrderSuccess from './Components/Cart/OrderSuccess'
+
 import Login from './Components/User/Login'
 import Register from './Components/User/Register'
 import Profile from './Components/User/Profile'
@@ -47,6 +53,12 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
+
+          {/* Checkout: cart -> shipping -> confirm -> payment -> success */}
+          <Route path="/shipping" element={<ProtectedRoute><Shipping /></ProtectedRoute>} />
+          <Route path="/confirm" element={<ProtectedRoute><ConfirmOrder /></ProtectedRoute>} />
+          <Route path="/payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
+          <Route path="/success" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
 
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
