@@ -74,7 +74,6 @@ const Sidebar = () => {
 
     const productsActive = pathname.startsWith('/admin/product')
     const [open, setOpen] = useState(productsActive)
-
     const initial = (user?.name || 'A').charAt(0).toUpperCase()
 
     return (
@@ -103,22 +102,6 @@ const Sidebar = () => {
                     overflowY: 'auto',
                 }}
             >
-                {/* Brand */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, py: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                    <Box
-                        sx={{
-                            width: 36, height: 36, borderRadius: 2, bgcolor: GOLD, color: GREEN_DARK,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800,
-                        }}
-                    >
-                        C
-                    </Box>
-                    <Box>
-                        <Typography sx={{ color: '#fff', fontWeight: 700, lineHeight: 1.1 }}>Cartify</Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Admin Panel</Typography>
-                    </Box>
-                </Box>
-
                 <Group label="OVERVIEW">
                     <li>
                         <Box component={Link} to="/dashboard" sx={itemSx(pathname === '/dashboard')}>
@@ -193,7 +176,7 @@ const Sidebar = () => {
                             <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Administrator</Typography>
                         </Box>
                     </Box>
-                    <Box component={Link} to="/" sx={{ ...itemSx(false), borderTop: '1px solid rgba(255,255,255,0.08)', py: 1.6 }}>
+                    <Box component={Link} to="/shop" sx={{ ...itemSx(false), borderTop: '1px solid rgba(255,255,255,0.08)', py: 1.6 }}>
                         <Ico name="fa-arrow-left" /> Back to store
                     </Box>
                 </Box>

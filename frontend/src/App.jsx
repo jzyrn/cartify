@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
@@ -11,6 +12,7 @@ import Footer from './Components/Layout/Footer'
 import ProtectedRoute from './Components/Route/ProtectedRoute'
 
 import Home from './Components/Home'
+import Loader from './Components/Layout/Loader'
 import ProductDetails from './Components/Product/ProductDetails'
 import Cart from './Components/Cart/Cart'
 
@@ -40,6 +42,15 @@ import UsersList from './Components/Admin/UsersList'
 import UpdateUser from './Components/Admin/UpdateUser'
 import ProductReviews from './Components/Admin/ProductReviews'
 
+const HomeEntry = () => {
+  const { isAuthenticated, loading, user } = useSelector((state) => state.auth)
+
+  // Wait for the session lookup before choosing the role-specific home page.
+  if (loading || typeof isAuthenticated === 'undefined') return <Loader />
+  if (isAuthenticated && user?.role === 'admin') return <Navigate to="/dashboard" replace />
+  return <Home />
+}
+
 function App() {
   useEffect(() => {
     store.dispatch(loadUser())
@@ -50,7 +61,8 @@ function App() {
       <Router>
         <Header />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<HomeEntry />} />
+          <Route path="/shop" element={<Home />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
 
