@@ -31,17 +31,21 @@ import {
     CLEAR_ERRORS
 } from '../constants/productConstants';
 
-export const getProducts = (currentPage = 1, keyword = '', price, category = '') => async (dispatch) => {
+export const getProducts = (currentPage = 1, keyword = '', price, category = '', minimumRating = 0) => async (dispatch) => {
     try {
         dispatch({
             type: ALL_PRODUCTS_REQUEST
         })
 
-        let link = `${import.meta.env.VITE_API}/products?page=${currentPage}&keyword=${keyword}&price[lte]=${price[1]}&price[gte]=${price[0]}`
-
-        if (category) {
-            link = `${import.meta.env.VITE_API}/products?keyword=${keyword}&page=${currentPage}&price[lte]=${price[1]}&price[gte]=${price[0]}&category=${encodeURIComponent(category)}`
-        }
+        const params = new URLSearchParams({
+            page: currentPage,
+            keyword,
+            'price[lte]': price[1],
+            'price[gte]': price[0],
+        })
+        if (category) params.set('category', category)
+        if (minimumRating > 0) params.set('rating', minimumRating)
+        const link = `${import.meta.env.VITE_API}/products?${params.toString()}`
         const { data } = await axios.get(link)
         console.log(data)
         dispatch({
@@ -162,11 +166,29 @@ export const newReview = (reviewData) => async (dispatch) => {
             type: NEW_REVIEW_SUCCESS,
             payload: data.success
         })
+        return data
     } catch (error) {
+        const message = error.response?.data?.message || error.message || 'Could not save your review.'
         dispatch({
             type: NEW_REVIEW_FAIL,
-            payload: error.response.data.message
+            payload: message
         })
+        return { success: false, message }
+    }
+}
+
+export const getReviewEligibility = async (id) => {
+    try {
+        const { data } = await axios.get(
+            `${import.meta.env.VITE_API}/product/${id}/review-eligibility`,
+            { withCredentials: true }
+        )
+        return data
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Could not check review eligibility.',
+        }
     }
 }
 

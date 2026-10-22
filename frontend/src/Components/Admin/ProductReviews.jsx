@@ -1,103 +1,99 @@
-import React, { useState, useEffect } from 'react'
-import { Box, Button, Paper, TextField, Typography } from '@mui/material'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Alert, Box, Button, Paper, Typography } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import Swal from 'sweetalert2'
 import axios from 'axios'
+import { toast } from 'react-toastify'
 
 import MetaData from '../Layout/MetaData'
-import { AdminLayout, PageHeader, IconAction, primaryBtnSx, fieldSx, cardSx, dataGridSx, gridProps, idCellSx } from './AdminUI'
-import { getUser, getToken, errMsg } from '../Utils/helpers'
+import { AdminLayout, PageHeader, IconAction, cardSx, dataGridSx, gridProps, idCellSx } from './AdminUI'
 
 const ProductReviews = () => {
-    const [productId, setProductId] = useState('')
-    const [error, setError] = useState('')
-    const [listReviews, setListReviews] = useState([])
-    const [deleteError, setDeleteError] = useState('')
-    const [isDeleted, setIsDeleted] = useState(false)
-    const [user, setUser] = useState(getUser())
+    const [reviews, setReviews] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState('')
+    const initialLoadStarted = useRef(false)
 
-    const config = {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`
-        }
-    }
-
-    const getProductReviews = async (id) => {
+    const loadReviews = useCallback(async () => {
+        setLoading(true)
+        setLoadError('')
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/reviews?id=${id}`, config)
-            setListReviews(data.reviews)
+            // Reviews are embedded in product documents, so reuse the existing
+            // authenticated admin-products endpoint and flatten them for the table.
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/products`, {
+                withCredentials: true,
+            })
+            const allReviews = (data.products || []).flatMap((product) =>
+                (product.reviews || []).map((review) => ({
+                    ...review,
+                    productId: product._id,
+                    productName: product.name,
+                }))
+            )
+            setReviews(allReviews)
         } catch (error) {
-            setError(error.response.data.message)
+            const message = error.response?.data?.message || error.message || 'Could not load product reviews.'
+            setLoadError(message)
+            toast.error(message, { position: 'bottom-right', toastId: 'admin-product-reviews-load' })
+        } finally {
+            setLoading(false)
         }
-    }
-
-    const deleteReview = async (id, productId) => {
-        try {
-            const { data } = await axios.delete(`${import.meta.env.VITE_API}/reviews?id=${id}&productId=${productId}`, config)
-            setIsDeleted(data.success)
-        } catch (error) {
-            setDeleteError(error.response.data.message)
-        }
-    }
-
-    const deleteReviewHandler = (id) => {
-        Swal.fire({
-            title: 'Delete Review',
-            icon: 'info',
-            text: 'Do you want to delete this review',
-            confirmButtonText: 'Delete',
-            confirmButtonColor: '#17332a',
-            showCancelButton: true
-        }).then((result) => {
-            if (result.isConfirmed) {
-                deleteReview(id, productId)
-            }
-        })
-    }
+    }, [])
 
     useEffect(() => {
-        if (error) {
-            setError('')
-        }
+        if (initialLoadStarted.current) return
+        initialLoadStarted.current = true
+        loadReviews()
+    }, [loadReviews])
 
-        if (deleteError) {
-            setDeleteError('')
+    const deleteReview = async (reviewId, productId) => {
+        try {
+            await axios.delete(
+                `${import.meta.env.VITE_API}/reviews?id=${reviewId}&productId=${productId}`,
+                { withCredentials: true }
+            )
+            toast.success('Review deleted successfully', { position: 'bottom-right' })
+            await loadReviews()
+        } catch (error) {
+            toast.error(error.response?.data?.message || error.message || 'Could not delete the review.', { position: 'bottom-right' })
         }
+    }
 
-        if (productId !== '') {
-            getProductReviews(productId)
-        }
-
-        if (isDeleted) {
-            errMsg('Review deleted successfully', 'success')
-            setIsDeleted(false)
-        }
-    }, [error, productId, isDeleted, deleteError])
-
-    const submitHandler = (e) => {
-        e.preventDefault()
-        getProductReviews(productId)
+    const confirmDelete = (reviewId, productId) => {
+        Swal.fire({
+            title: 'Delete review?',
+            text: 'This review will be removed from the product.',
+            icon: 'warning',
+            confirmButtonText: 'Delete',
+            confirmButtonColor: '#17332a',
+            showCancelButton: true,
+        }).then((result) => {
+            if (result.isConfirmed) deleteReview(reviewId, productId)
+        })
     }
 
     const columns = [
         {
-            field: 'id',
-            headerName: 'Review ID',
+            field: 'productName',
+            headerName: 'Product',
             flex: 1,
-            minWidth: 200,
-            renderCell: (params) => <Box component="span" sx={idCellSx}>{params.value}</Box>,
+            minWidth: 180,
         },
         {
             field: 'rating',
             headerName: 'Rating',
-            width: 110,
-            renderCell: (params) => (
-                <Box component="span" sx={{ color: '#8c7418', fontWeight: 700 }}>{params.value} ★</Box>
-            ),
+            width: 100,
+            renderCell: (params) => <Box component="span" sx={{ color: '#8c7418', fontWeight: 700 }}>{params.value} ★</Box>,
         },
-        { field: 'comment', headerName: 'Comment', flex: 2, minWidth: 220 },
-        { field: 'user', headerName: 'User', flex: 1, minWidth: 140 },
+        { field: 'comment', headerName: 'Review', flex: 2, minWidth: 240 },
+        { field: 'name', headerName: 'Customer', flex: 1, minWidth: 140 },
+        {
+            field: 'productId',
+            headerName: 'Product ID',
+            flex: 1,
+            minWidth: 180,
+            renderCell: (params) => <Box component="span" sx={idCellSx}>{params.value}</Box>,
+        },
         {
             field: 'actions',
             headerName: 'Actions',
@@ -105,48 +101,51 @@ const ProductReviews = () => {
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <IconAction onClick={() => deleteReviewHandler(params.id)} icon="fa-trash" title="Delete" tone="danger" />
+                <IconAction
+                    onClick={() => confirmDelete(params.row.id, params.row.productId)}
+                    icon="fa-trash"
+                    title="Delete review"
+                    tone="danger"
+                />
             ),
         },
     ]
 
-    const rows = listReviews.map(review => ({
+    const rows = reviews.map((review) => ({
         id: review._id,
-        comment: review.comment,
+        productId: review.productId,
+        productName: review.productName,
         rating: review.rating,
-        user: review.user,
+        comment: review.comment,
+        name: review.name,
     }))
 
     return (
         <>
-            <MetaData title={'Product Reviews'} />
+            <MetaData title="Product Reviews" />
             <AdminLayout>
-                <PageHeader title="Product Reviews" subtitle="Search a product by its ID to see and manage its reviews" />
-
-                <Paper variant="outlined" sx={cardSx}>
-                    <Box component="form" onSubmit={submitHandler} sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-end' }}>
-                        <TextField
-                            id="productId_field"
-                            label="Product ID"
-                            value={productId}
-                            onChange={(e) => setProductId(e.target.value)}
-                            sx={{ flex: 1, minWidth: 240, ...fieldSx }}
-                        />
-                        <Button type="submit" disableElevation sx={{ ...primaryBtnSx, height: 56 }}>
-                            Search
-                        </Button>
-                    </Box>
-                </Paper>
-
-                {listReviews && listReviews.length > 0 ? (
-                    <Paper variant="outlined" sx={{ ...cardSx, p: 0, overflow: 'hidden' }}>
-                        <DataGrid rows={rows} columns={columns} getRowId={(row) => row.id} sx={dataGridSx} {...gridProps} />
-                    </Paper>
-                ) : (
-                    <Paper variant="outlined" sx={{ ...cardSx, textAlign: 'center', py: 6 }}>
-                        <Typography color="text.secondary">No reviews to show.</Typography>
-                    </Paper>
+                <PageHeader title="Product Reviews" subtitle={`${rows.length} customer review${rows.length === 1 ? '' : 's'}`} />
+                {loadError && (
+                    <Alert
+                        severity="error"
+                        action={<Button color="inherit" size="small" onClick={loadReviews}>Retry</Button>}
+                    >
+                        {loadError}
+                    </Alert>
                 )}
+                <Paper variant="outlined" sx={{ ...cardSx, p: 0, overflow: 'hidden' }}>
+                    {loading ? (
+                        <Box sx={{ p: 5, textAlign: 'center' }}>
+                            <Typography color="text.secondary">Loading reviews…</Typography>
+                        </Box>
+                    ) : rows.length > 0 ? (
+                        <DataGrid rows={rows} columns={columns} getRowId={(row) => row.id} sx={dataGridSx} {...gridProps} />
+                    ) : (
+                        <Box sx={{ p: 6, textAlign: 'center' }}>
+                            <Typography color="text.secondary">No reviews have been submitted yet.</Typography>
+                        </Box>
+                    )}
+                </Paper>
             </AdminLayout>
         </>
     )

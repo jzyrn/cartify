@@ -1,5 +1,5 @@
 const Product = require('../models/product')
-// const Order = require('../models/order')
+const Order = require('../models/order')
 const cloudinary = require('cloudinary')
 const APIFeatures = require('../utils/apiFeatures');
 
@@ -195,42 +195,87 @@ exports.getAdminProducts = async (req, res, next) => {
 }
 
 exports.createProductReview = async (req, res, next) => {
-    const { rating, comment, productId } = req.body;
-    const review = {
+    const { rating, comment, productId } = req.body
+    const numericRating = Number(rating)
+    const cleanComment = typeof comment === 'string' ? comment.trim() : ''
+
+    if (!productId || !Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5 || !cleanComment) {
+        return res.status(400).json({ success: false, message: 'Please provide a rating from 1 to 5 and a review comment.' })
+    }
+
+    const product = await Product.findById(productId)
+    if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found.' })
+    }
+
+    const hasDeliveredPurchase = await Order.exists({
         user: req.user._id,
-        name: req.user.name,
-        rating: Number(rating),
-        comment
+        orderStatus: 'Delivered',
+        'orderItems.product': product._id,
+    })
+    if (!hasDeliveredPurchase) {
+        return res.status(403).json({ success: false, message: 'You can review this product after one of your orders containing it has been delivered.' })
     }
-    const product = await Product.findById(productId);
-    const isReviewed = product.reviews.find(
-        r => r.user.toString() === req.user._id.toString()
+
+    product.reviews = product.reviews || []
+    const existingReview = product.reviews.find(
+        review => String(review.user) === String(req.user._id)
     )
-    if (isReviewed) {
-        product.reviews.forEach(review => {
-            if (review.user.toString() === req.user._id.toString()) {
-                review.comment = comment;
-                review.rating = rating;
-            }
-        })
+
+    if (existingReview) {
+        existingReview.comment = cleanComment
+        existingReview.rating = numericRating
+        existingReview.name = req.user.name
+        existingReview.isSeeded = false
     } else {
-        product.reviews.push(review);
-        product.numOfReviews = product.reviews.length
-    }
-    product.ratings = product.reviews.reduce((acc, item) => item.rating + acc, 0) / product.reviews.length
-    await product.save({ validateBeforeSave: false });
-    if (!product)
-        return res.status(400).json({
-            success: false,
-            message: 'review not posted'
+        product.reviews.push({
+            user: req.user._id,
+            name: req.user.name,
+            rating: numericRating,
+            comment: cleanComment,
         })
+    }
+
+    product.numOfReviews = product.reviews.length
+    product.ratings = product.numOfReviews
+        ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.numOfReviews
+        : 0
+    await product.save()
+
     return res.status(200).json({
-        success: true
+        success: true,
+        message: existingReview ? 'Your review was updated.' : 'Your review was added.',
+        product,
+    })
+}
+
+exports.getReviewEligibility = async (req, res) => {
+    const product = await Product.findById(req.params.id)
+    if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found.' })
+    }
+
+    const hasDeliveredPurchase = await Order.exists({
+        user: req.user._id,
+        orderStatus: 'Delivered',
+        'orderItems.product': product._id,
+    })
+    const existingReview = (product.reviews || []).find(
+        review => String(review.user) === String(req.user._id)
+    )
+
+    return res.status(200).json({
+        success: true,
+        canReview: Boolean(hasDeliveredPurchase),
+        hasReviewed: Boolean(existingReview),
     })
 }
 
 exports.getProductReviews = async (req, res, next) => {
     const product = await Product.findById(req.query.id);
+    if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found.' })
+    }
     res.status(200).json({
         success: true,
         reviews: product.reviews
@@ -238,26 +283,40 @@ exports.getProductReviews = async (req, res, next) => {
 }
 
 exports.deleteReview = async (req, res, next) => {
-    console.log(req.query)
-    const product = await Product.findById(req.query.productId);
-    const reviews = product.reviews.filter(review => review._id.toString() !== req.query.id.toString());
-    const numOfReviews = reviews.length;
+    const { id, productId } = req.query
+    if (!id || !productId) {
+        return res.status(400).json({ success: false, message: 'Review ID and product ID are required.' })
+    }
 
-    const ratings = product.reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length
+    try {
+        // Pull the subdocument directly so unrelated product validation cannot
+        // prevent an admin from removing a review.
+        const result = await Product.updateOne(
+            { _id: productId, 'reviews._id': id },
+            { $pull: { reviews: { _id: id } } }
+        )
 
-    await Product.findByIdAndUpdate(req.query.productId, {
-        reviews,
-        ratings,
-        numOfReviews
-    }, {
-        new: true,
-        runValidators: true,
-        useFindAndModify: false
-    })
+        if (!result.modifiedCount) {
+            const productExists = await Product.exists({ _id: productId })
+            return res.status(404).json({
+                success: false,
+                message: productExists ? 'Review not found.' : 'Product not found.',
+            })
+        }
 
-    return res.status(200).json({
-        success: true
-    })
+        const product = await Product.findById(productId).select('reviews.rating')
+        const reviews = product?.reviews || []
+        const numOfReviews = reviews.length
+        const ratings = numOfReviews
+            ? reviews.reduce((sum, review) => sum + review.rating, 0) / numOfReviews
+            : 0
+
+        await Product.updateOne({ _id: productId }, { $set: { numOfReviews, ratings } })
+
+        return res.status(200).json({ success: true })
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || 'Could not delete review.' })
+    }
 }
 
 exports.productSales = async (req, res, next) => {

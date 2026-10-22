@@ -20,7 +20,8 @@ class APIFeatures {
     }
 
     filter() {
-        // { 'price[gte]': '100', 'price[lte]': '1000' }
+        // Express may parse bracketed query parameters as either flat keys or
+        // nested objects, depending on the query parser configuration.
         const queryCopy = { ...this.queryStr };
         // console.log(queryCopy);
         // Removing fields from the query
@@ -28,23 +29,34 @@ class APIFeatures {
         removeFields.forEach(el => delete queryCopy[el]);
 
         let priceFilter = {};
-        if (queryCopy['price[gte]'] || queryCopy['price[lte]']) {
+        const minimumPrice = queryCopy['price[gte]'] ?? queryCopy.price?.gte;
+        const maximumPrice = queryCopy['price[lte]'] ?? queryCopy.price?.lte;
+        if (minimumPrice !== undefined || maximumPrice !== undefined) {
             priceFilter.price = {};
-            if (queryCopy['price[gte]']) {
-                priceFilter.price.$gte = Number(queryCopy['price[gte]']);
+            if (minimumPrice !== undefined) {
+                priceFilter.price.$gte = Number(minimumPrice);
             }
-            if (queryCopy['price[lte]']) {
-                priceFilter.price.$lte = Number(queryCopy['price[lte]']);
+            if (maximumPrice !== undefined) {
+                priceFilter.price.$lte = Number(maximumPrice);
             }
-            // priceFilter {
-            //     price: {
-            //         $gte: 100,
-            //         $lte: 1000
-            //     }
-            // }
-            delete queryCopy['price[gte]'];
-            delete queryCopy['price[lte]'];
         }
+        delete queryCopy.price;
+        delete queryCopy['price[gte]'];
+        delete queryCopy['price[lte]'];
+
+        // exact customer rating filter
+        const selectedRating = queryCopy.rating ?? queryCopy['ratings[gte]'] ?? queryCopy.ratings?.gte;
+        if (selectedRating !== undefined && selectedRating !== '') {
+            const ratingValue = Number(selectedRating);
+            if (Number.isFinite(ratingValue) && ratingValue >= 1 && ratingValue <= 5) {
+                priceFilter.ratings = ratingValue === 5
+                    ? 5
+                    : { $gte: ratingValue, $lt: ratingValue + 1 };
+            }
+        }
+        delete queryCopy.rating;
+        delete queryCopy.ratings;
+        delete queryCopy['ratings[gte]'];
 
         // category filter (from the category chips)
         if (queryCopy.category) {

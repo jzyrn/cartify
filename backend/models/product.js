@@ -27,6 +27,39 @@ const productSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    numOfReviews: {
+        type: Number,
+        default: 0
+    },
+    reviews: [
+        {
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+                required: true
+            },
+            name: {
+                type: String,
+                required: true
+            },
+            rating: {
+                type: Number,
+                required: true,
+                min: 1,
+                max: 5
+            },
+            comment: {
+                type: String,
+                required: true,
+                trim: true,
+                maxlength: 1000
+            },
+            isSeeded: {
+                type: Boolean,
+                default: false
+            }
+        }
+    ],
     images: [
         {
             public_id: {

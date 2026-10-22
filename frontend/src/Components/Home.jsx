@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Container, Row, Col } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+} from "@mui/material";
 import Box from "@mui/material/Box";
 import Slider from "@mui/material/Slider";
 import Chip from "@mui/material/Chip";
@@ -9,9 +18,16 @@ import Alert from "@mui/material/Alert";
 import Rating from "@mui/material/Rating";
 import Fab from "@mui/material/Fab";
 import Typography from "@mui/material/Typography";
+import Paper from "@mui/material/Paper";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
 import MetaData from "./Layout/MetaData";
 import Loader from "./Layout/Loader";
 import { getProducts } from "../actions/productActions";
+import { addItemToCart } from "../actions/cartActions";
+import cartifyHero from "../assets/cartify_hero_cosmetics.png";
 
 const categories = [
   "Foundation",
@@ -29,15 +45,22 @@ const GOLD = "#c9a227";
 
 export default function Home() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   let { keyword } = useParams();
 
   const { loading, products, error, filteredProductsCount } = useSelector(
     (state) => state.products
   );
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
 
   const [activeCategory, setActiveCategory] = useState("All");
   const [price, setPrice] = useState([1, 1000]); // applied filter (triggers a fetch)
   const [sliderValue, setSliderValue] = useState([1, 1000]); // what the slider shows while dragging
+  const [minimumRating, setMinimumRating] = useState(0);
+  const [quickViewProduct, setQuickViewProduct] = useState(null);
+  const [selectedShade, setSelectedShade] = useState("");
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [addingToCart, setAddingToCart] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   // every product loaded so far (infinite scroll keeps adding to this list)
@@ -49,10 +72,18 @@ export default function Home() {
 
   const hasMore =
     filteredProductsCount !== undefined && allProducts.length < filteredProductsCount;
+  const visibleProducts = minimumRating === 0
+    ? allProducts
+    : allProducts.filter((product) => {
+        const rating = Number(product.ratings) || 0;
+        return minimumRating === 5
+          ? rating === 5
+          : rating >= minimumRating && rating < minimumRating + 1;
+      });
 
   // fetch a page whenever the page or a filter changes
   useEffect(() => {
-    const filterKey = `${keyword || ""}|${activeCategory}|${price[0]}-${price[1]}`;
+    const filterKey = `${keyword || ""}|${activeCategory}|${price[0]}-${price[1]}|${minimumRating}`;
 
     if (prevFilterKey.current !== null && prevFilterKey.current !== filterKey) {
       // a filter changed: start over from page 1 with an empty list
@@ -70,10 +101,11 @@ export default function Home() {
         currentPage,
         keyword,
         price,
-        activeCategory === "All" ? "" : activeCategory
+        activeCategory === "All" ? "" : activeCategory,
+        minimumRating
       )
     );
-  }, [dispatch, currentPage, keyword, activeCategory, price]);
+  }, [dispatch, currentPage, keyword, activeCategory, price, minimumRating]);
 
   // when a page arrives, replace the list (page 1) or add to it (page 2, 3, ...)
   useEffect(() => {
@@ -92,6 +124,8 @@ export default function Home() {
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
+    // If a rating filter has no matches, don't keep paging through the list.
+    if (minimumRating > 0 && visibleProducts.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -104,9 +138,49 @@ export default function Home() {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loading, error, hasMore, allProducts.length]);
+  }, [loading, error, hasMore, allProducts.length, minimumRating, visibleProducts.length]);
 
   const valuetext = (value) => `P${value.toString()}`;
+
+  const openQuickView = (product) => {
+    setQuickViewProduct(product);
+    setSelectedShade("");
+    setSelectedQuantity(1);
+  };
+
+  const addQuickViewToCart = async () => {
+    if (!quickViewProduct) return;
+    const hasShades = quickViewProduct.shades?.length > 0;
+    if (hasShades && !selectedShade) {
+      toast.error("Please choose a shade", { position: "bottom-right" });
+      return;
+    }
+    if (!isAuthenticated) {
+      toast.info("Please log in to add items to your cart", { position: "bottom-right" });
+      navigate("/login?redirect=/cart");
+      return;
+    }
+
+    setAddingToCart(true);
+    try {
+      const added = await dispatch(
+        addItemToCart(quickViewProduct._id, selectedQuantity, selectedShade)
+      );
+      if (added) {
+        toast.success("Added to your cart", { position: "bottom-right" });
+        setQuickViewProduct(null);
+      } else {
+        toast.info("Please log in to add items to your cart", { position: "bottom-right" });
+        navigate("/login?redirect=/cart");
+      }
+    } catch (addError) {
+      toast.error(addError.response?.data?.message || "Could not add this product to your cart.", {
+        position: "bottom-right",
+      });
+    } finally {
+      setAddingToCart(false);
+    }
+  };
 
   const renderCard = (p) => (
     <Col key={p._id} sm={6} lg={4} className="mb-4">
@@ -128,7 +202,23 @@ export default function Home() {
           <h3 className="shop-card-name">{p.name}</h3>
 
           {/* MUI Rating (read-only) */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+          <Box
+            component={Link}
+            to={`/product/${p._id}#reviews`}
+            aria-label={`View ${p.numOfReviews || 0} reviews for ${p.name}`}
+            title="View customer reviews"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              mb: 1,
+              width: "fit-content",
+              color: "inherit",
+              textDecoration: "none",
+              cursor: "pointer",
+              "&:hover .MuiTypography-root": { color: GREEN, textDecoration: "underline" },
+            }}
+          >
             <Rating value={p.ratings || 0} precision={0.5} readOnly size="small" />
             <Typography variant="caption">({p.numOfReviews || 0})</Typography>
           </Box>
@@ -137,6 +227,14 @@ export default function Home() {
             <span className="shop-card-price">₱{p.price}</span>
           </div>
           <div className="shop-card-actions">
+            <button
+              type="button"
+              className="shop-card-btn solid"
+              onClick={() => openQuickView(p)}
+              disabled={p.stock <= 0}
+            >
+              {p.stock > 0 ? "Add to Cart" : "Out of Stock"}
+            </button>
             <Link to={`/product/${p._id}`} className="shop-card-btn outline">
               View Details
             </Link>
@@ -149,6 +247,35 @@ export default function Home() {
   return (
     <div className="shop-page">
       <MetaData title="Cartify - Online Shopping " />
+
+      {!isAuthenticated && !keyword && (
+        <section
+          className="cartify-guest-hero"
+          aria-label="Discover Cartify beauty products"
+          style={{
+            "--cartify-hero-image": `url(${cartifyHero})`,
+          }}
+        >
+          <Container className="cartify-guest-hero-content">
+            <p className="cartify-guest-hero-eyebrow">A little Cartify, a lot of you</p>
+            <h1>
+              Find your <em>everyday</em> favorite.
+            </h1>
+            <p className="cartify-guest-hero-copy">
+              Explore makeup picks made for your routine, your style, and every
+              version of you.
+            </p>
+            <div className="cartify-guest-hero-actions">
+              <a className="cartify-guest-hero-primary" href="#featured-products">
+                Explore the collection
+              </a>
+              <Link className="cartify-guest-hero-secondary" to="/register">
+                Join Cartify
+              </Link>
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* MUI Chips as the category filter */}
       <section className="shop-category-rail">
@@ -178,32 +305,73 @@ export default function Home() {
       </section>
 
       {/* full-page loader only for the very first load of a list */}
-      {loading && allProducts.length === 0 ? (
+      {loading && allProducts.length === 0 && filteredProductsCount === undefined ? (
         <Loader />
       ) : (
-        <section className="shop-products">
+        <section className="shop-products" id="featured-products">
           <Container>
             <div className="shop-section-heading">
               <h2>{keyword ? `Results for "${keyword}"` : "Featured products"}</h2>
             </div>
 
-            {/* MUI Slider as the price filter, always visible */}
-            <Box sx={{ maxWidth: 360, mb: 4 }}>
-              <Typography gutterBottom>
-                Price range: ₱{sliderValue[0]} – ₱{sliderValue[1]}
-              </Typography>
-              <Slider
-                getAriaLabel={() => "Price Filter"}
-                value={sliderValue}
-                onChange={(event, newValue) => setSliderValue(newValue)}
-                onChangeCommitted={(event, newValue) => setPrice(newValue)}
-                valueLabelDisplay="auto"
-                getAriaValueText={valuetext}
-                min={1}
-                max={1000}
-                sx={{ color: GREEN }}
-              />
-            </Box>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: { xs: 2, sm: 2.5 },
+                mb: 4,
+                borderColor: "#e5e2d9",
+                borderRadius: 2,
+                boxShadow: "0 5px 18px rgba(26, 51, 41, 0.04)",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) 240px" },
+                  columnGap: { xs: 2, sm: 5 },
+                  rowGap: 2,
+                  alignItems: "center",
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ color: GREEN, fontWeight: 700, mb: 0.25 }}>
+                    Price range
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ₱{sliderValue[0]} – ₱{sliderValue[1]}
+                  </Typography>
+                  <Slider
+                    getAriaLabel={() => "Price Filter"}
+                    value={sliderValue}
+                    onChange={(event, newValue) => setSliderValue(newValue)}
+                    onChangeCommitted={(event, newValue) => setPrice(newValue)}
+                    valueLabelDisplay="auto"
+                    getAriaValueText={valuetext}
+                    min={1}
+                    max={1000}
+                    sx={{ color: GREEN, mt: 1, mb: 0, "& .MuiSlider-thumb": { border: `2px solid ${GOLD}` } }}
+                  />
+                </Box>
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="review-rating-filter-label">Customer rating</InputLabel>
+                  <Select
+                    labelId="review-rating-filter-label"
+                    id="review-rating-filter"
+                    value={minimumRating}
+                    label="Customer rating"
+                    onChange={(event) => setMinimumRating(Number(event.target.value))}
+                    sx={{ borderRadius: 1.5, "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: GREEN } }}
+                  >
+                    <MenuItem value={0}>All reviews</MenuItem>
+                    {[4, 3, 2, 1].map((rating) => (
+                      <MenuItem key={rating} value={rating}>
+                        <Rating value={rating} readOnly size="small" />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            </Paper>
 
             {/* MUI Alerts for errors and empty results */}
             {error && (
@@ -212,13 +380,21 @@ export default function Home() {
               </Alert>
             )}
 
-            {!error && !loading && filteredProductsCount === 0 && (
+            {!error && !loading && visibleProducts.length === 0 && (
               <Alert severity="info" sx={{ mb: 3 }}>
-                No products found. Try a different category or price range.
+                {minimumRating > 0
+                  ? `No ${minimumRating}-star reviews found.`
+                  : "No products found. Try a different category or price range."}
               </Alert>
             )}
 
-            <Row>{allProducts.map(renderCard)}</Row>
+            {loading && allProducts.length === 0 && (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                <Loader size={28} fullScreen={false} />
+              </Box>
+            )}
+
+            <Row>{visibleProducts.map(renderCard)}</Row>
 
             {/* infinite scroll footer */}
             <div ref={sentinelRef} className="text-center my-4">
@@ -265,6 +441,154 @@ export default function Home() {
           </Container>
         </section>
       )}
+
+      <Dialog
+        open={Boolean(quickViewProduct)}
+        onClose={() => !addingToCart && setQuickViewProduct(null)}
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="quick-view-title"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+      >
+        {quickViewProduct && (
+          <>
+            <DialogTitle
+              id="quick-view-title"
+              sx={{ color: GREEN, fontWeight: 700, pr: 7, pb: 0.5 }}
+            >
+              {quickViewProduct.name}
+              <IconButton
+                aria-label="Close product details"
+                onClick={() => setQuickViewProduct(null)}
+                disabled={addingToCart}
+                sx={{ position: "absolute", right: 12, top: 10, color: "text.secondary" }}
+              >
+                <span aria-hidden="true">×</span>
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers sx={{ borderColor: "#edf0ed" }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "160px 1fr" },
+                  gap: 2.5,
+                  py: 0.5,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: "100%",
+                    aspectRatio: "1 / 1",
+                    borderRadius: 2,
+                    bgcolor: "#faecd9",
+                    overflow: "hidden",
+                    display: "grid",
+                    placeItems: "center",
+                    color: GREEN,
+                  }}
+                >
+                  {quickViewProduct.images?.[0]?.url ? (
+                    <Box
+                      component="img"
+                      src={quickViewProduct.images[0].url}
+                      alt={quickViewProduct.name}
+                      sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <i className="fa fa-shopping-bag" aria-hidden="true" />
+                  )}
+                </Box>
+                <Box>
+                  <Typography variant="overline" sx={{ color: "text.secondary", lineHeight: 1.5 }}>
+                    {quickViewProduct.category}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: GOLD, fontWeight: 600 }}>
+                    {quickViewProduct.brand}
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, my: 0.75 }}>
+                    <Rating value={Number(quickViewProduct.ratings || 0)} precision={0.5} readOnly size="small" />
+                    <Typography variant="caption" color="text.secondary">
+                      ({quickViewProduct.numOfReviews || 0} reviews)
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" sx={{ color: GREEN, fontWeight: 700, mb: 0.75 }}>
+                    ₱{Number(quickViewProduct.price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                    {quickViewProduct.description || "A Cartify favorite for your everyday routine."}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                    {quickViewProduct.stock} in stock
+                  </Typography>
+                </Box>
+              </Box>
+
+              {quickViewProduct.shades?.length > 0 && (
+                <Box sx={{ mt: 2.5 }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: GREEN }}>
+                    Choose a shade {selectedShade && `· ${selectedShade}`}
+                  </Typography>
+                  <Box className="cartify-shades">
+                    {quickViewProduct.shades.map((shade) => (
+                      <button
+                        key={shade}
+                        type="button"
+                        className={`cartify-shade${selectedShade === shade ? " active" : ""}`}
+                        aria-pressed={selectedShade === shade}
+                        onClick={() => setSelectedShade(shade)}
+                      >
+                        {shade}
+                      </button>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 2.5 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: GREEN }}>Quantity</Typography>
+                <Box className="cartify-qty">
+                  <button
+                    type="button"
+                    aria-label="Decrease quantity"
+                    onClick={() => setSelectedQuantity((quantity) => Math.max(1, quantity - 1))}
+                  >−</button>
+                  <span>{selectedQuantity}</span>
+                  <button
+                    type="button"
+                    aria-label="Increase quantity"
+                    disabled={selectedQuantity >= quickViewProduct.stock}
+                    onClick={() => setSelectedQuantity((quantity) => Math.min(quickViewProduct.stock, quantity + 1))}
+                  >+</button>
+                </Box>
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ p: 2, gap: 1 }}>
+              <Button
+                onClick={() => setQuickViewProduct(null)}
+                disabled={addingToCart}
+                sx={{ color: GREEN, textTransform: "none", fontWeight: 600 }}
+              >
+                Keep browsing
+              </Button>
+              <Button
+                onClick={addQuickViewToCart}
+                variant="contained"
+                disabled={addingToCart || quickViewProduct.stock <= 0 || (quickViewProduct.shades?.length > 0 && !selectedShade)}
+                sx={{
+                  bgcolor: GREEN,
+                  borderBottom: `3px solid ${GOLD}`,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  px: 2.5,
+                  "&:hover": { bgcolor: "#12241c" },
+                }}
+              >
+                {addingToCart ? "Adding…" : "Add to Cart"}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </div>
   );
 }
