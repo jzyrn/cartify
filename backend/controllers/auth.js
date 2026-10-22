@@ -166,9 +166,12 @@ exports.facebookLogin = async (req, res) => {
 
 // GET /api/v1/logout
 exports.logout = (req, res) => {
+    const isProduction = String(process.env.NODE_ENV).toLowerCase() === 'production'
     res.cookie('token', null, {
         expires: new Date(Date.now()),
-        httpOnly: true
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
     })
     res.status(200).json({ success: true, message: 'Logged out' })
 }
