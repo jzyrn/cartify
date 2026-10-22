@@ -44,10 +44,11 @@ const OrdersList = () => {
         {
             field: 'id',
             headerName: 'Order ID',
-            flex: 1,
-            minWidth: 200,
+            flex: 1.2,
+            minWidth: 220,
             renderCell: (params) => <Box component="span" sx={idCellSx}>{params.value}</Box>,
         },
+        { field: 'customer', headerName: 'Customer', flex: 0.8, minWidth: 160 },
         { field: 'numofItems', headerName: 'Items', width: 100, align: 'right', headerAlign: 'right' },
         { field: 'amount', headerName: 'Amount', width: 140, align: 'right', headerAlign: 'right' },
         {
@@ -73,6 +74,7 @@ const OrdersList = () => {
 
     const rows = orders.map(order => ({
         id: order._id,
+        customer: order.user?.name || 'Customer unavailable',
         numofItems: order.orderItems.length,
         amount: `₱${order.totalPrice}`,
         status: order.orderStatus,

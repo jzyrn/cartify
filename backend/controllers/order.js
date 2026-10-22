@@ -12,6 +12,19 @@ const fail = (res, error, status) => {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+const dateRangeMatch = ({ startDate, endDate } = {}) => {
+    const createdAt = {}
+    if (startDate) {
+        const start = new Date(`${startDate}T00:00:00.000Z`)
+        if (!Number.isNaN(start.getTime())) createdAt.$gte = start
+    }
+    if (endDate) {
+        const end = new Date(`${endDate}T23:59:59.999Z`)
+        if (!Number.isNaN(end.getTime())) createdAt.$lte = end
+    }
+    return Object.keys(createdAt).length ? { createdAt } : {}
+}
+
 // order flow: Pending -> Preparing -> Shipped -> Delivered
 // Cancelled is a side exit, only reachable from Pending (by the customer)
 const ADMIN_STATUSES = ['Pending', 'Preparing', 'Shipped', 'Delivered']
@@ -34,7 +47,7 @@ exports.newOrder = async (req, res) => {
             shippingPrice,
             totalPrice,
             paymentInfo,
-            paidAt: Date.now(),
+            paidAt: paymentInfo?.status === 'succeeded' ? Date.now() : undefined,
             user: req.user._id
         })
 
@@ -104,7 +117,9 @@ exports.cancelOrder = async (req, res) => {
 // GET /admin/orders
 exports.allOrders = async (req, res) => {
     try {
-        const orders = await Order.find().sort({ createdAt: -1 })
+        const orders = await Order.find()
+            .populate('user', 'name email')
+            .sort({ createdAt: -1 })
 
         // cancelled orders are not counted as revenue
         const totalAmount = orders
@@ -183,7 +198,7 @@ exports.deleteOrder = async (req, res) => {
 exports.salesPerMonth = async (req, res) => {
     try {
         const data = await Order.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' } } },
+            { $match: { orderStatus: { $ne: 'Cancelled' }, ...dateRangeMatch(req.query) } },
             {
                 $group: {
                     _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
@@ -208,7 +223,7 @@ exports.salesPerMonth = async (req, res) => {
 exports.productSales = async (req, res) => {
     try {
         const rows = await Order.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' } } },
+            { $match: { orderStatus: { $ne: 'Cancelled' }, ...dateRangeMatch(req.query) } },
             { $unwind: '$orderItems' },
             {
                 $group: {
@@ -236,7 +251,7 @@ exports.productSales = async (req, res) => {
 exports.customerSales = async (req, res) => {
     try {
         const customerSales = await Order.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' } } },
+            { $match: { orderStatus: { $ne: 'Cancelled' }, ...dateRangeMatch(req.query) } },
             { $group: { _id: '$user', total: { $sum: '$totalPrice' } } },
             { $sort: { total: -1 } },
             { $limit: 10 },

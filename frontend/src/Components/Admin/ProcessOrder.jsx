@@ -47,7 +47,7 @@ const ProcessOrder = () => {
     }
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`
-    const isPaid = paymentInfo && paymentInfo.status === 'succeeded' ? true : false
+    const isPaid = paymentInfo?.status === 'succeeded' || paymentInfo?.id?.startsWith('CARD-')
     const delivered = order.orderStatus && String(order.orderStatus).includes('Delivered')
 
     return (
@@ -75,7 +75,7 @@ const ProcessOrder = () => {
                                     <InfoRow label="Payment status">
                                         <StatusPill label={isPaid ? 'PAID' : 'NOT PAID'} tone={isPaid ? 'good' : 'danger'} />
                                     </InfoRow>
-                                    <InfoRow label="Stripe ID">{paymentInfo && paymentInfo.id}</InfoRow>
+                                    <InfoRow label="Payment reference">{paymentInfo && paymentInfo.id}</InfoRow>
                                 </Paper>
 
                                 <Paper variant="outlined" sx={cardSx}>

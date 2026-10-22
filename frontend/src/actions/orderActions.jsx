@@ -28,6 +28,9 @@ import {
 
 } from '../constants/orderConstants'
 
+// Same as the professor's createOrder, with two changes for Payment.jsx:
+//  - it returns the result, so the page knows whether the order was saved
+//  - the error message no longer crashes when the server can't be reached (no error.response)
 export const createOrder = (order) => async (dispatch) => {
     try {
         dispatch({ type: CREATE_ORDER_REQUEST })
@@ -42,11 +45,14 @@ export const createOrder = (order) => async (dispatch) => {
             type: CREATE_ORDER_SUCCESS,
             payload: data
         })
+        return data
     } catch (error) {
+        const message = error.response?.data?.message || error.message
         dispatch({
             type: CREATE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: message
         })
+        return { success: false, message }
     }
 
 }
@@ -91,9 +97,30 @@ export const allOrders = () => async (dispatch) => {
             //AxiosRequestConfig parameter
             withCredentials: true //correct
         })
+
+        let orders = data.orders || []
+        const needsCustomerLookup = orders.some(order => order.user && !order.user.name)
+
+        // Older API deployments may return the raw user ID instead of a populated user.
+        if (needsCustomerLookup) {
+            try {
+                const { data: usersData } = await axios.get(`${import.meta.env.VITE_API}/admin/users`, {
+                    withCredentials: true
+                })
+                const usersById = new Map((usersData.users || []).map(user => [String(user._id), user]))
+                orders = orders.map(order => {
+                    if (order.user?.name || !order.user) return order
+                    const userId = typeof order.user === 'object' ? order.user._id : order.user
+                    return { ...order, user: usersById.get(String(userId)) || order.user }
+                })
+            } catch {
+                // Keep the order list usable if the optional customer lookup fails.
+            }
+        }
+
         dispatch({
             type: ALL_ORDERS_SUCCESS,
-            payload: data
+            payload: { ...data, orders }
         })
     } catch (error) {
         dispatch({

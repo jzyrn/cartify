@@ -30,7 +30,7 @@ const OrderDetails = () => {
     }, [error, dispatch])
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`
-    const isPaid = paymentInfo && paymentInfo.status === 'succeeded' ? true : false
+    const isPaid = paymentInfo?.status === 'succeeded' || paymentInfo?.id?.startsWith('CARD-')
     const delivered = orderStatus && String(orderStatus).includes('Delivered')
 
     return (
