@@ -77,9 +77,6 @@ export const newProduct = (productData) => async (dispatch) => {
     try {
         dispatch({ type: NEW_PRODUCT_REQUEST })
         const config = {
-            headers: {
-                'Content-Type': 'application/json'
-            },
             withCredentials: true //correct
         }
         const { data } = await axios.post(`${import.meta.env.VITE_API}/admin/product/new`, productData, config)
@@ -88,9 +85,10 @@ export const newProduct = (productData) => async (dispatch) => {
             payload: data
         })
     } catch (error) {
+        const message = error.response?.data?.message || error.message || 'Unable to create product'
         dispatch({
             type: NEW_PRODUCT_FAIL,
-            payload: error.response.data.message
+            payload: message
         })
     }
 }
@@ -118,9 +116,6 @@ export const updateProduct = (id, productData) => async (dispatch) => {
     try {
         dispatch({ type: UPDATE_PRODUCT_REQUEST })
         const config = {
-            headers: {
-                'Content-Type': 'application/json'
-            },
             withCredentials: true
         }
         const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/product/${id}`, productData, config)
@@ -129,9 +124,10 @@ export const updateProduct = (id, productData) => async (dispatch) => {
             payload: data.success
         })
     } catch (error) {
+        const message = error.response?.data?.message || error.message || 'Unable to update product'
         dispatch({
             type: UPDATE_PRODUCT_FAIL,
-            payload: error.response.data.message
+            payload: message
         })
     }
 }

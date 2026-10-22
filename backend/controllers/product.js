@@ -4,17 +4,10 @@ const cloudinary = require('cloudinary')
 const APIFeatures = require('../utils/apiFeatures');
 
 exports.newProduct = async (req, res, next) => {
-    console.log(req.files)
     let images = []
-    // if (typeof req.files === 'string') {
-    //     images.push(req.files)
-    // } else {
-    //     images = req.files
-    // }
-
     if (typeof req.body.images === 'string') {
         images.push(req.body.images)
-    } else {
+    } else if (Array.isArray(req.body.images)) {
         images = req.body.images
     }
 
@@ -22,9 +15,7 @@ exports.newProduct = async (req, res, next) => {
 
     for (let i = 0; i < images.length; i++) {
         try {
-            // const result = await cloudinary.v2.uploader.upload(images[i].path, {
             const result = await cloudinary.v2.uploader.upload(images[i], {
-
                 folder: 'products',
                 width: 150,
                 crop: "scale",
@@ -38,25 +29,22 @@ exports.newProduct = async (req, res, next) => {
         } catch (error) {
             console.log(error)
         }
-
     }
 
     req.body.images = imagesLinks
-    // req.body.user = req.user.id;
+    try {
+        const product = await Product.create(req.body);
 
-    const product = await Product.create(req.body);
-
-    if (!product)
+        return res.status(201).json({
+            success: true,
+            product
+        })
+    } catch (err) {
         return res.status(400).json({
             success: false,
-            message: 'Product not created'
+            message: err.message
         })
-
-
-    return res.status(201).json({
-        success: true,
-        product
-    })
+    }
 }
 
 exports.getSingleProduct = async (req, res, next) => {
@@ -111,52 +99,68 @@ exports.getProducts = async (req, res) => {
 }
 
 exports.updateProduct = async (req, res, next) => {
-    let product = await Product.findById(req.params.id);
-    console.log(req.body)
-    if (!product) {
-        return res.status(404).json({
+    try {
+        let product = await Product.findById(req.params.id);
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found'
+            })
+        }
+
+        const uploadedFiles = req.files || []
+        let images = []
+        if (uploadedFiles.length > 0) {
+            images = uploadedFiles.map(file => file.path)
+        } else if (typeof req.body.images === 'string') {
+            images.push(req.body.images)
+        } else if (Array.isArray(req.body.images)) {
+            images = req.body.images
+        }
+
+        if (images.length > 0) {
+            let imagesLinks = [];
+            for (let i = 0; i < images.length; i++) {
+                const result = await cloudinary.v2.uploader.upload(images[i], {
+                    folder: 'products',
+                    width: 150,
+                    crop: "scale",
+                });
+                imagesLinks.push({
+                    public_id: result.public_id,
+                    url: result.secure_url
+                })
+            }
+
+            for (let i = 0; i < (product.images || []).length; i++) {
+                try {
+                    await cloudinary.v2.uploader.destroy(product.images[i].public_id)
+                } catch (error) {
+                    console.log(error)
+                }
+            }
+            req.body.images = imagesLinks
+        } else {
+            delete req.body.images
+        }
+
+        product = await Product.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true,
+            useFindAndModify: false
+        })
+
+        return res.status(200).json({
+            success: true,
+            product
+        })
+    } catch (err) {
+        return res.status(500).json({
             success: false,
-            message: 'Product not found'
+            message: `Unable to update product: ${err.message}`
         })
     }
-    let images = []
-
-    // if (typeof req.files === 'string') {
-    //     images.push(req.files)
-    // } else {
-    //     images = req.files
-    // }
-    if (typeof req.body.images === 'string') {
-        images.push(req.body.images)
-    } else {
-        images = req.body.images
-    }
-    // console.log(images)
-
-    let imagesLinks = [];
-    for (let i = 0; i < images.length; i++) {
-        const result = await cloudinary.v2.uploader.upload(images[i], {
-            folder: 'products',
-            width: 150,
-            crop: "scale",
-        });
-        imagesLinks.push({
-            public_id: result.public_id,
-            url: result.secure_url
-        })
-
-    }
-    req.body.images = imagesLinks
-    product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-        runValidators: true,
-        useFindandModify: false
-    })
-    // console.log(product)
-    return res.status(200).json({
-        success: true,
-        product
-    })
 }
 
 exports.deleteProduct = async (req, res, next) => {

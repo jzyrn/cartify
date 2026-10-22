@@ -1,35 +1,38 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useFormik } from 'formik'
 import { useNavigate } from 'react-router-dom'
-import { Box, Button, Paper, TextField, Typography } from '@mui/material'
+import { Autocomplete, Box, Button, CircularProgress, MenuItem, Paper, TextField, Typography } from '@mui/material'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
 import { AdminLayout, PageHeader, primaryBtnSx, fieldSx, cardSx, GREEN, GOLD } from './AdminUI'
-import { newProduct, clearErrors } from '../../actions/productActions'
+import { newProduct, getAdminProducts, clearErrors } from '../../actions/productActions'
 import { NEW_PRODUCT_RESET } from '../../constants/productConstants'
 import { productSchema } from '../../validation/schemas'
 
 const categories = [
-    'Electronics',
-    'Cameras',
-    'Laptops',
-    'Accessories',
-    'Headphones',
-    'Food',
-    'Books',
-    'Clothes/Shoes',
-    'Beauty/Health',
-    'Sports',
-    'Outdoor',
-    'Home'
+    'Foundation',
+    'Concealer',
+    'Powder',
+    'Blush & Highlighter',
+    'Eyeshadow',
+    'Eyeliner & Mascara',
+    'Lipstick & Lip Tint',
+    'Brows'
 ]
 
 const NewProduct = () => {
     const dispatch = useDispatch()
     const { loading, error, success } = useSelector(state => state.newProduct)
+    const { products = [] } = useSelector(state => state.products)
+
+    // brand options come from the products that already exist
+    const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort()
+
+    // becomes true once the seller is typed by hand, so the brand stops overwriting it
+    const sellerEdited = useRef(false)
 
     const [images, setImages] = useState([])
     const [imagesPreview, setImagesPreview] = useState([])
@@ -43,18 +46,19 @@ const NewProduct = () => {
             description: '',
             category: '',
             stock: '',
+            brand: '',
             seller: '',
         },
         validationSchema: productSchema,
         onSubmit: (values) => {
-        const formData = new FormData()
-        Object.entries(values).forEach(([key, value]) => formData.set(key, value))
+            const formData = new FormData()
+            Object.entries(values).forEach(([key, value]) => formData.set(key, value))
 
-        images.forEach(image => {
-            formData.append('images', image)
-        })
+            images.forEach(image => {
+                formData.append('images', image)
+            })
 
-        dispatch(newProduct(formData))
+            dispatch(newProduct(formData))
         },
     })
 
@@ -73,6 +77,10 @@ const NewProduct = () => {
             reader.readAsDataURL(file)
         })
     }
+
+    useEffect(() => {
+        dispatch(getAdminProducts())
+    }, [dispatch])
 
     useEffect(() => {
         if (error) {
@@ -124,20 +132,46 @@ const NewProduct = () => {
                             id="category_field"
                             label="Category"
                             select
-                            SelectProps={{ native: true }}
-                            InputLabelProps={{ shrink: true }}
+                            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
                             {...formik.getFieldProps('category')}
                             error={formik.touched.category && Boolean(formik.errors.category)}
                             helperText={formik.touched.category && formik.errors.category}
                             sx={fieldSx}
                         >
-                            <option value="" disabled>Select a category</option>
+                            <MenuItem value="" disabled>Select a category</MenuItem>
                             {categories.map(category => (
-                                <option key={category} value={category}>{category}</option>
+                                <MenuItem key={category} value={category}>{category}</MenuItem>
                             ))}
                         </TextField>
-                        <TextField id="seller_field" label="Seller Name" {...formik.getFieldProps('seller')} error={formik.touched.seller && Boolean(formik.errors.seller)} helperText={formik.touched.seller && formik.errors.seller} sx={fieldSx} />
+
+                        {/* picking a brand also fills the seller, unless the seller was typed by hand */}
+                        <Autocomplete
+                            freeSolo
+                            options={brands}
+                            inputValue={formik.values.brand}
+                            onInputChange={(e, value) => {
+                                formik.setFieldValue('brand', value)
+                                if (!sellerEdited.current) formik.setFieldValue('seller', value)
+                            }}
+                            renderInput={(params) => (
+                                <TextField {...params} id="brand_field" label="Brand" sx={fieldSx} />
+                            )}
+                        />
                     </Box>
+
+                    <TextField
+                        id="seller_field"
+                        label="Seller Name"
+                        {...formik.getFieldProps('seller')}
+                        onChange={(e) => {
+                            sellerEdited.current = true
+                            formik.handleChange(e)
+                        }}
+                        error={formik.touched.seller && Boolean(formik.errors.seller)}
+                        helperText={formik.touched.seller && formik.errors.seller}
+                        fullWidth
+                        sx={fieldSx}
+                    />
 
                     <Box>
                         <Typography variant="body2" fontWeight={600} sx={{ color: GREEN, mb: 1 }}>Images</Typography>
@@ -162,8 +196,15 @@ const NewProduct = () => {
                         </Box>
                     </Box>
 
-                    <Button type="submit" fullWidth size="large" disableElevation disabled={loading ? true : false} sx={primaryBtnSx}>
-                        Create
+                    <Button type="submit" fullWidth size="large" disableElevation disabled={Boolean(loading)} sx={primaryBtnSx}>
+                        {loading ? (
+                            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
+                                <CircularProgress size={18} sx={{ color: GOLD }} />
+                                Creating...
+                            </Box>
+                        ) : (
+                            'Create'
+                        )}
                     </Button>
                 </Paper>
             </AdminLayout>
