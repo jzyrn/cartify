@@ -64,7 +64,7 @@ const FacebookF = () => (
 const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID
 
 const Login = () => {
-    const { isAuthenticated, error, loading } = useSelector(state => state.auth)
+    const { isAuthenticated, error, loading, user } = useSelector(state => state.auth)
     const [showPassword, setShowPassword] = useState(false)
     const [loginError, setLoginError] = useState('')
     const [notice, setNotice] = useState('')
@@ -132,16 +132,16 @@ const Login = () => {
 
     useEffect(() => {
         if (isAuthenticated && redirect === 'shipping') {
-            navigate(`/${redirect}`)
+            navigate('/shipping')
         } else if (isAuthenticated) {
-            navigate('/')
+            navigate(user?.role === 'admin' ? '/dashboard' : '/')
         }
         if (error) {
             // shown as a MUI Alert inside the form
             setLoginError(error)
             dispatch(clearErrors())
         }
-    }, [error, isAuthenticated, dispatch, navigate, redirect])
+    }, [error, isAuthenticated, dispatch, navigate, redirect, user?.role])
 
     // shows a message when a protected page sent the visitor here
     // (kept after the effect above so its message is the one that stays on screen)

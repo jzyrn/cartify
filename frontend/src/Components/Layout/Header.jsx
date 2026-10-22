@@ -46,7 +46,7 @@ export function Header() {
       <Navbar expand="lg" className="shop-navbar py-2" variant="dark">
         {/* fluid = full width, so the logo sits at the far left instead of inside a centered box */}
         <Container fluid className="px-3 px-lg-4">
-          <Navbar.Brand as={Link} to="/" className="shop-brand me-4 py-0">
+          <Navbar.Brand as={Link} to={user?.role === "admin" ? "/dashboard" : "/"} className="shop-brand me-4 py-0">
             <img
               src={cartifyLogo}
               alt="Cartify"
@@ -67,6 +67,7 @@ export function Header() {
                 <NavDropdown
                   align="end"
                   id="user-dropdown"
+                  className="cartify-profile-dropdown"
                   title={
                     <span className="d-inline-flex align-items-center gap-2 text-white">
                       <i className="fa fa-user-o" style={iconStyle} />
@@ -76,15 +77,25 @@ export function Header() {
                 >
                   {user.role === "admin" && (
                     <NavDropdown.Item as={Link} to="/dashboard">
-                      Dashboard
+                      <i className="fa fa-tachometer me-2" aria-hidden="true" />
+                      <span>Dashboard</span>
                     </NavDropdown.Item>
                   )}
                   <NavDropdown.Item as={Link} to="/me">
-                    Profile
+                    <i className="fa fa-user-o me-2" aria-hidden="true" />
+                    <span>Profile</span>
                   </NavDropdown.Item>
-                  <NavDropdown.Item as={Link} to="/orders/me">
-                    My Orders
-                  </NavDropdown.Item>
+                  {user.role === "admin" ? (
+                    <NavDropdown.Item as={Link} to="/admin/orders">
+                      <i className="fa fa-shopping-bag me-2" aria-hidden="true" />
+                      <span>Manage Orders</span>
+                    </NavDropdown.Item>
+                  ) : (
+                    <NavDropdown.Item as={Link} to="/orders/me">
+                      <i className="fa fa-list-alt me-2" aria-hidden="true" />
+                      <span>My Orders</span>
+                    </NavDropdown.Item>
+                  )}
                 </NavDropdown>
               ) : (
                 <Link to="/login" style={iconLinkStyle} title="Login / Register">

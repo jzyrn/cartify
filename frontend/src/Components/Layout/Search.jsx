@@ -60,7 +60,7 @@ export default function Search() {
       component="form"
       onSubmit={handleSearch}
       className="shop-search-form"
-      sx={{ display: "flex", alignItems: "stretch", width: { xs: "100%", lg: 340 } }}
+      sx={{ display: "flex", alignItems: "stretch", width: { xs: "100%", lg: 320 } }}
     >
       <Autocomplete
         freeSolo
@@ -133,7 +133,8 @@ export default function Search() {
         className="shop-search-btn"
         aria-label="Search"
         style={{
-          width: 44,
+          width: 38,
+          minWidth: 38,
           border: 0,
           borderBottom: `3px solid ${GOLD}`,
           borderRadius: "0 8px 8px 0",
@@ -142,7 +143,7 @@ export default function Search() {
           cursor: "pointer",
         }}
       >
-        <i className="fa fa-search" />
+        <i className="fa fa-search" style={{ fontSize: 18 }} />
       </button>
     </Box>
   );
