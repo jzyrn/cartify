@@ -10,14 +10,19 @@ const GOLD = '#c9a227'
 
 const short = (v) => (v >= 1000 ? `₱${v / 1000}k` : `₱${v}`)
 
-const UserSalesChart = () => {
+const UserSalesChart = ({ startDate, endDate }) => {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
     const userSales = async () => {
+        setLoading(true)
+        setError('')
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/customer-sales`, { withCredentials: true })
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/customer-sales`, {
+                params: { startDate, endDate },
+                withCredentials: true,
+            })
             setSales(data.customerSales)
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to load customer sales')
@@ -28,7 +33,7 @@ const UserSalesChart = () => {
 
     useEffect(() => {
         userSales()
-    }, [])
+    }, [startDate, endDate])
 
     if (loading || error || sales.length === 0) {
         return (

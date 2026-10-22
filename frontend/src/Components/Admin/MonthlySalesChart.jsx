@@ -10,14 +10,19 @@ const GOLD = '#c9a227'
 
 const short = (v) => (v >= 1000 ? `₱${v / 1000}k` : `₱${v}`)
 
-export default function MonthlySalesChart() {
+export default function MonthlySalesChart({ startDate, endDate }) {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
     const monthlySales = async () => {
+        setLoading(true)
+        setError('')
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/sales-per-month`, { withCredentials: true })
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/sales-per-month`, {
+                params: { startDate, endDate },
+                withCredentials: true,
+            })
             setSales(data.salesPerMonth)
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to load sales')
@@ -28,7 +33,7 @@ export default function MonthlySalesChart() {
 
     useEffect(() => {
         monthlySales()
-    }, [])
+    }, [startDate, endDate])
 
     if (loading || error || sales.length === 0) {
         return (

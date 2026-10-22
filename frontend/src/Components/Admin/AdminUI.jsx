@@ -8,18 +8,16 @@ export const GREEN = '#17332a'
 export const GREEN_DARK = '#0f241d'
 export const GOLD = '#c9a227'
 
-export const cardSx = { borderRadius: 3, borderColor: '#e3e9e5', p: 3, bgcolor: '#fff' }
+export const cardSx = { borderRadius: 2, borderColor: '#e3e9e5', p: 3, bgcolor: '#fff' }
 
-/* sidebar + content column used by every admin page */
+/* docked sidebar + content area used by every admin page */
 export const AdminLayout = ({ children }) => (
-    <div className="row">
-        <div className="col-12 col-md-2">
-            <Sidebar />
-        </div>
-        <div className="col-12 col-md-10">
-            <Box sx={{ py: 2, pr: { md: 2 }, display: 'flex', flexDirection: 'column', gap: 3 }}>{children}</Box>
-        </div>
-    </div>
+    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: 'stretch', bgcolor: '#f4f7f5' }}>
+        <Sidebar />
+        <Box component="main" sx={{ flex: 1, minWidth: 0, p: { xs: 2, md: 3 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {children}
+        </Box>
+    </Box>
 )
 
 export const PageHeader = ({ title, subtitle, action }) => (
