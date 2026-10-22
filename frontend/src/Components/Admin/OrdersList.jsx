@@ -55,7 +55,7 @@ const OrdersList = () => {
             field: 'status',
             headerName: 'Status',
             width: 140,
-            renderCell: (params) => <StatusPill label={params.value} tone={statusTone(params.value)} />,
+            renderCell: (params) => <StatusPill label={params.value === 'Preparing' ? 'Processing' : params.value} tone={statusTone(params.value)} />,
         },
         {
             field: 'actions',

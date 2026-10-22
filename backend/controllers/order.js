@@ -25,9 +25,10 @@ const dateRangeMatch = ({ startDate, endDate } = {}) => {
     return Object.keys(createdAt).length ? { createdAt } : {}
 }
 
-// order flow: Pending -> Preparing -> Shipped -> Delivered
+// order flow: Pending -> Processing -> Shipped -> Delivered
 // Cancelled is a side exit, only reachable from Pending (by the customer)
-const ADMIN_STATUSES = ['Pending', 'Preparing', 'Shipped', 'Delivered']
+const ADMIN_STATUSES = ['Processing', 'Preparing', 'Shipped', 'Delivered']
+const STATUS_FLOW = ['Pending', 'Processing', 'Shipped', 'Delivered']
 
 // POST /order/new
 exports.newOrder = async (req, res) => {
@@ -121,9 +122,9 @@ exports.allOrders = async (req, res) => {
             .populate('user', 'name email')
             .sort({ createdAt: -1 })
 
-        // cancelled orders are not counted as revenue
+        // only completed deliveries count as realized revenue
         const totalAmount = orders
-            .filter(order => order.orderStatus !== 'Cancelled')
+            .filter(order => order.orderStatus === 'Delivered')
             .reduce((acc, order) => acc + order.totalPrice, 0)
 
         res.status(200).json({ success: true, totalAmount, orders })
@@ -154,6 +155,15 @@ exports.updateOrder = async (req, res) => {
             return fail(res, 'Please choose a valid status', 400)
         }
 
+        // Preparing is the legacy name for Processing; keep accepting it for older clients.
+        const currentStatus = order.orderStatus === 'Preparing' ? 'Processing' : order.orderStatus
+        const nextStatus = status === 'Preparing' ? 'Processing' : status
+        const currentStatusIndex = STATUS_FLOW.indexOf(currentStatus)
+        const nextStatusIndex = STATUS_FLOW.indexOf(nextStatus)
+        if (currentStatusIndex < 0 || nextStatusIndex <= currentStatusIndex) {
+            return fail(res, 'Order status cannot move backward or remain unchanged', 400)
+        }
+
         // stock goes down once, when the order is delivered
         if (status === 'Delivered') {
             for (const item of order.orderItems) {
@@ -166,7 +176,7 @@ exports.updateOrder = async (req, res) => {
             order.deliveredAt = Date.now()
         }
 
-        order.orderStatus = status
+        order.orderStatus = nextStatus
         await order.save()
 
         res.status(200).json({ success: true })
@@ -198,7 +208,7 @@ exports.deleteOrder = async (req, res) => {
 exports.salesPerMonth = async (req, res) => {
     try {
         const data = await Order.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' }, ...dateRangeMatch(req.query) } },
+            { $match: { orderStatus: 'Delivered', ...dateRangeMatch(req.query) } },
             {
                 $group: {
                     _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
@@ -223,7 +233,7 @@ exports.salesPerMonth = async (req, res) => {
 exports.productSales = async (req, res) => {
     try {
         const rows = await Order.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' }, ...dateRangeMatch(req.query) } },
+            { $match: { orderStatus: 'Delivered', ...dateRangeMatch(req.query) } },
             { $unwind: '$orderItems' },
             {
                 $group: {
@@ -251,7 +261,7 @@ exports.productSales = async (req, res) => {
 exports.customerSales = async (req, res) => {
     try {
         const customerSales = await Order.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' }, ...dateRangeMatch(req.query) } },
+            { $match: { orderStatus: 'Delivered', ...dateRangeMatch(req.query) } },
             { $group: { _id: '$user', total: { $sum: '$totalPrice' } } },
             { $sort: { total: -1 } },
             { $limit: 10 },

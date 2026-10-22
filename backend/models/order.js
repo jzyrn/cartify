@@ -34,6 +34,10 @@ const orderSchema = mongoose.Schema({
                 type: String,
                 required: true
             },
+            shade: {
+                type: String,
+                default: ''
+            },
             quantity: {
                 type: Number,
                 required: true
@@ -85,12 +89,12 @@ const orderSchema = mongoose.Schema({
         required: true,
         default: 0.0
     },
-    // Pending (customer can still cancel) -> Preparing -> Shipped -> Delivered
+    // Pending (customer can still cancel) -> Processing -> Shipped -> Delivered
     // Cancelled is only reachable from Pending
     orderStatus: {
         type: String,
         required: true,
-        enum: ['Pending', 'Preparing', 'Shipped', 'Delivered', 'Cancelled'],
+        enum: ['Pending', 'Processing', 'Preparing', 'Shipped', 'Delivered', 'Cancelled'],
         default: 'Pending'
     },
     deliveredAt: {

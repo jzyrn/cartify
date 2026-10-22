@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
 import { PageHeader, PageLoader, InfoRow, StatusPill, cardSx, GREEN, GOLD } from '../Admin/AdminUI'
+import { formatOrderNumber } from '../Cart/checkoutUtils'
 import { clearErrors, getOrderDetails } from '../../actions/orderActions'
 
 const peso = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -51,9 +52,9 @@ const OrderDetails = () => {
                 ) : (
                     <>
                         <PageHeader
-                            title={`Order #${order._id || ''}`}
+                            title={`Order #${formatOrderNumber(order)}`}
                             subtitle="Details of your order"
-                            action={<StatusPill label={orderStatus} tone={delivered ? 'good' : 'gold'} />}
+                            action={<StatusPill label={orderStatus === 'Preparing' ? 'Processing' : orderStatus} tone={delivered ? 'good' : 'gold'} />}
                         />
 
                         <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, alignItems: 'start' }}>
@@ -61,7 +62,7 @@ const OrderDetails = () => {
                                 <Typography fontWeight={700} sx={{ color: GREEN, mb: 1 }}>Order Items</Typography>
                                 {orderItems && orderItems.map(item => (
                                     <Box
-                                        key={item.product}
+                                        key={`${item.product}-${item.shade || ''}`}
                                         sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.5, borderBottom: '1px solid #eef3f0', '&:last-of-type': { borderBottom: 0 } }}
                                     >
                                         <Box
@@ -70,13 +71,20 @@ const OrderDetails = () => {
                                             alt={item.name}
                                             sx={{ width: 64, height: 56, objectFit: 'cover', borderRadius: 2, bgcolor: '#eef3f0' }}
                                         />
-                                        <Typography
-                                            component={Link}
-                                            to={`/product/${item.product}`}
-                                            sx={{ flex: 1, color: GREEN, fontWeight: 600, textDecoration: 'none', '&:hover': { color: GOLD } }}
-                                        >
-                                            {item.name}
-                                        </Typography>
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                            <Typography
+                                                component={Link}
+                                                to={`/product/${item.product}`}
+                                                sx={{ color: GREEN, fontWeight: 600, textDecoration: 'none', '&:hover': { color: GOLD } }}
+                                            >
+                                                {item.name}
+                                            </Typography>
+                                            {item.shade && (
+                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                                                    Shade / variant: {item.shade}
+                                                </Typography>
+                                            )}
+                                        </Box>
                                         <Typography variant="body2" color="text.secondary">{item.quantity} pc(s)</Typography>
                                         <Typography fontWeight={700} sx={{ color: GREEN, minWidth: 90, textAlign: 'right' }}>
                                             {peso(item.price)}

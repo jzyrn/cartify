@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Box, Button, Paper, TextField, Typography } from '@mui/material'
+import { Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
@@ -11,6 +11,7 @@ import { getOrderDetails, updateOrder, clearErrors } from '../../actions/orderAc
 import { UPDATE_ORDER_RESET } from '../../constants/orderConstants'
 
 const peso = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const STATUS_FLOW = ['Pending', 'Processing', 'Shipped', 'Delivered']
 
 const ProcessOrder = () => {
     const dispatch = useDispatch()
@@ -23,6 +24,9 @@ const ProcessOrder = () => {
     let { id } = useParams()
     const { shippingInfo, orderItems, paymentInfo, user, totalPrice, orderStatus } = order
     const orderId = id
+    const currentStatus = orderStatus === 'Preparing' ? 'Processing' : orderStatus
+    const currentStatusIndex = STATUS_FLOW.indexOf(currentStatus)
+    const terminalStatus = currentStatus === 'Delivered' || currentStatus === 'Cancelled'
 
     const errMsg = (message = '') => toast.error(message, { position: 'bottom-center' })
     const successMsg = (message = '') => toast.success(message, { position: 'bottom-center' })
@@ -41,9 +45,8 @@ const ProcessOrder = () => {
     }, [error, isUpdated, orderId])
 
     const updateOrderHandler = (id) => {
-        const formData = new FormData()
-        formData.set('status', status)
-        dispatch(updateOrder(id, formData))
+        if (!status) return
+        dispatch(updateOrder(id, { status }))
     }
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`
@@ -110,27 +113,28 @@ const ProcessOrder = () => {
                             <Paper variant="outlined" sx={{ ...cardSx, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                                 <Box>
                                     <Typography fontWeight={700} sx={{ color: GREEN, mb: 1 }}>Order Status</Typography>
-                                    <StatusPill label={orderStatus} tone={delivered ? 'good' : 'gold'} />
+                                <StatusPill label={orderStatus === 'Preparing' ? 'Processing' : orderStatus} tone={delivered ? 'good' : 'gold'} />
                                 </Box>
 
                                 <TextField
                                     label="Update status"
                                     name="status"
                                     select
-                                    SelectProps={{ native: true }}
-                                    InputLabelProps={{ shrink: true }}
                                     value={status}
                                     onChange={(e) => setStatus(e.target.value)}
                                     fullWidth
+                                    disabled={terminalStatus}
                                     sx={fieldSx}
                                 >
-                                    <option value="" disabled>Select status</option>
-                                    <option value="Processing">Processing</option>
-                                    <option value="Shipped">Shipped</option>
-                                    <option value="Delivered">Delivered</option>
+                                    <MenuItem value="" disabled>Select status</MenuItem>
+                                    <MenuItem value="Pending" disabled>Pending</MenuItem>
+                                    {/* Keep the legacy API value while showing the user-friendly label. */}
+                                    <MenuItem value="Preparing" disabled={currentStatusIndex !== 0}>Processing</MenuItem>
+                                    <MenuItem value="Shipped" disabled={currentStatusIndex >= 2}>Shipped</MenuItem>
+                                    <MenuItem value="Delivered" disabled={currentStatusIndex >= 3}>Delivered</MenuItem>
                                 </TextField>
 
-                                <Button fullWidth disableElevation sx={primaryBtnSx} onClick={() => updateOrderHandler(order._id)}>
+                                <Button fullWidth disableElevation disabled={!status} sx={primaryBtnSx} onClick={() => updateOrderHandler(order._id)}>
                                     Update Status
                                 </Button>
                             </Paper>

@@ -133,13 +133,9 @@ export const allOrders = () => async (dispatch) => {
 export const updateOrder = (id, orderData) => async (dispatch) => {
     try {
         dispatch({ type: UPDATE_ORDER_REQUEST })
-        const config = {
-            headers: {
-                'Content-Type': 'application/json'
-            },
+        const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/order/${id}`, orderData, {
             withCredentials: true
-        }
-        const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/order/${id}`, orderData, config)
+        })
         dispatch({
             type: UPDATE_ORDER_SUCCESS,
             payload: data.success
@@ -147,7 +143,7 @@ export const updateOrder = (id, orderData) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: UPDATE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Could not update order status'
         })
 
     }
