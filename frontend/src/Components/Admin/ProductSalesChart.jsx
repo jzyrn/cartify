@@ -12,7 +12,7 @@ const pieColors = [
     '#8c7418', '#7fb59d', '#f0dc9a', '#0f241d', '#a98a1c',
 ]
 
-export default function ProductSalesChart({ startDate, endDate }) {
+export default function ProductSalesChart() {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -21,10 +21,7 @@ export default function ProductSalesChart({ startDate, endDate }) {
         setLoading(true)
         setError('')
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/product-sales`, {
-                params: { startDate, endDate },
-                withCredentials: true,
-            })
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/product-sales`, { withCredentials: true })
             setSales(data.totalPercentage)
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to load product sales')
@@ -35,7 +32,7 @@ export default function ProductSalesChart({ startDate, endDate }) {
 
     useEffect(() => {
         productSales()
-    }, [startDate, endDate])
+    }, [])
 
     if (loading || error || sales.length === 0) {
         return (

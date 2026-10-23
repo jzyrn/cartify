@@ -202,7 +202,7 @@ const Dashboard = () => {
                         icon="fa-money"
                         to="/admin/orders"
                         loading={ordersLoading}
-                        note="All time"
+                        note="Delivered orders"
                     />
                     <StatCard
                         label="Orders"
@@ -237,7 +237,7 @@ const Dashboard = () => {
                         <Box>
                             <Typography fontWeight={700} sx={{ color: GREEN }}>Sales date range</Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Filter monthly, product, and customer sales charts.
+                                Filter monthly and customer sales charts.
                             </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
@@ -281,18 +281,18 @@ const Dashboard = () => {
 
                 {/* Charts row 1 */}
                 <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>
-                    <SectionCard title="Monthly Sales" subtitle="Revenue per month">
-                        <MonthlySalesChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
+                    <SectionCard title="Monthly Sales" subtitle="Revenue from delivered orders per month">
+                        <MonthlySalesChart orders={orders} startDate={dateRange.startDate} endDate={dateRange.endDate} />
                     </SectionCard>
-                    <SectionCard title="Product Sales" subtitle="Share of total sales">
-                        <ProductSalesChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
+                    <SectionCard title="Product Sales" subtitle="Product share of delivered sales (all time)">
+                        <ProductSalesChart />
                     </SectionCard>
                 </Box>
 
                 {/* Charts row 2 */}
                 <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' } }}>
-                    <SectionCard title="Customer Sales" subtitle="Total spent per customer (top customer in gold)">
-                        <UserSalesChart startDate={dateRange.startDate} endDate={dateRange.endDate} />
+                    <SectionCard title="Customer Sales" subtitle="Delivered order spend per customer (top customer in gold)">
+                        <UserSalesChart orders={orders} startDate={dateRange.startDate} endDate={dateRange.endDate} />
                     </SectionCard>
 
                     <SectionCard title="Out of Stock" subtitle="Products that need restocking">

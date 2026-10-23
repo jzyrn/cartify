@@ -1,48 +1,47 @@
-import React, { useState, useEffect } from 'react'
+import React, { useMemo } from 'react'
 import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { Box, Typography } from '@mui/material'
-import axios from 'axios'
-import Loader from '../Layout/Loader'
 
-const GREEN = '#17332a'
 const GREEN_MID = '#2f6b55'
 const GOLD = '#c9a227'
 
-const short = (v) => (v >= 1000 ? `₱${v / 1000}k` : `₱${v}`)
+const short = (value) => (value >= 1000 ? `₱${value / 1000}k` : `₱${value}`)
+const dateKey = (value) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${date.getFullYear()}-${month}-${day}`
+}
 
-export default function MonthlySalesChart({ startDate, endDate }) {
-    const [sales, setSales] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
+export default function MonthlySalesChart({ orders = [], startDate, endDate }) {
+    const sales = useMemo(() => {
+        const byMonth = new Map()
 
-    const monthlySales = async () => {
-        setLoading(true)
-        setError('')
-        try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/sales-per-month`, {
-                params: { startDate, endDate },
-                withCredentials: true,
+        orders.forEach((order) => {
+            if (order.orderStatus !== 'Delivered') return
+            const key = dateKey(order.createdAt)
+            if (!key || (startDate && key < startDate) || (endDate && key > endDate)) return
+
+            const monthKey = key.slice(0, 7)
+            byMonth.set(monthKey, (byMonth.get(monthKey) || 0) + Number(order.totalPrice || 0))
+        })
+
+        return [...byMonth.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([monthKey, total]) => {
+                const [year, month] = monthKey.split('-').map(Number)
+                return {
+                    month: new Date(year, month - 1, 1).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' }),
+                    total,
+                }
             })
-            setSales(data.salesPerMonth)
-        } catch (error) {
-            setError(error.response?.data?.message || 'Failed to load sales')
-        } finally {
-            setLoading(false)
-        }
-    }
+    }, [orders, startDate, endDate])
 
-    useEffect(() => {
-        monthlySales()
-    }, [startDate, endDate])
-
-    if (loading || error || sales.length === 0) {
+    if (sales.length === 0) {
         return (
             <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {loading ? (
-                    <Loader size={28} fullScreen={false} />
-                ) : (
-                    <Typography color="text.secondary" variant="body2">{error || 'No sales data yet.'}</Typography>
-                )}
+                <Typography color="text.secondary" variant="body2">No delivered sales in this date range.</Typography>
             </Box>
         )
     }
@@ -60,7 +59,7 @@ export default function MonthlySalesChart({ startDate, endDate }) {
                 <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7a73' }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7a73' }} tickFormatter={short} width={55} />
                 <Tooltip
-                    formatter={(v) => [`₱${Number(v).toLocaleString('en-PH')}`, 'Sales']}
+                    formatter={(value) => [`₱${Number(value).toLocaleString('en-PH')}`, 'Sales']}
                     contentStyle={{ borderRadius: 10, border: '1px solid #e3e9e5', boxShadow: 'none' }}
                 />
                 <Area
