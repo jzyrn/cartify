@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useFormik } from 'formik'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Autocomplete, Box, Button, CircularProgress, MenuItem, Paper, TextField, Typography } from '@mui/material'
+import { Autocomplete, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
+import { ActionLoader } from '../Layout/Loader'
 import { AdminLayout, PageHeader, primaryBtnSx, fieldSx, cardSx, GREEN, GOLD } from './AdminUI'
 import { updateProduct, getProductDetails, getAdminProducts, clearErrors } from '../../actions/productActions'
 import { UPDATE_PRODUCT_RESET } from '../../constants/productConstants'
@@ -216,7 +217,7 @@ const UpdateProduct = () => {
                     <Button type="submit" fullWidth size="large" disableElevation disabled={Boolean(loading)} sx={primaryBtnSx}>
                         {loading ? (
                             <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
-                                <CircularProgress size={18} sx={{ color: GOLD }} />
+                                <ActionLoader size={20} color="#fff" />
                                 Updating...
                             </Box>
                         ) : (

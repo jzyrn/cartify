@@ -25,6 +25,7 @@ import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import MetaData from "./Layout/MetaData";
 import Loader from "./Layout/Loader";
+import { ActionLoader } from "./Layout/Loader";
 import { getProducts } from "../actions/productActions";
 import { addItemToCart } from "../actions/cartActions";
 import cartifyHero from "../assets/cartify_hero_cosmetics.png";
@@ -583,7 +584,7 @@ export default function Home() {
                   "&:hover": { bgcolor: "#12241c" },
                 }}
               >
-                {addingToCart ? "Adding…" : "Add to Cart"}
+                {addingToCart ? <><ActionLoader size={18} color="#fff" />Adding…</> : "Add to Cart"}
               </Button>
             </DialogActions>
           </>

@@ -24,6 +24,7 @@ import {
 } from '@mui/material'
 
 import MetaData from '../Layout/MetaData'
+import { ActionLoader } from '../Layout/Loader'
 import CheckoutSteps from './CheckoutSteps'
 import { createOrder } from '../../actions/orderActions'
 import { clearCart } from '../../actions/cartActions'
@@ -253,7 +254,7 @@ const Payment = () => {
                                 '&:hover': { bgcolor: GREEN_DARK, color: GOLD },
                             }}
                         >
-                            {placing ? 'Placing order…' : method === 'card' && selectedCard
+                            {placing ? <><ActionLoader size={20} color="#fff" />Placing order…</> : method === 'card' && selectedCard
                                 ? `Pay with card · ${peso(totalPrice)}`
                                 : `Place order · ${peso(totalPrice)}`}
                         </Button>

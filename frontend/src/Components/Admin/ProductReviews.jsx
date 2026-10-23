@@ -6,12 +6,14 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 
 import MetaData from '../Layout/MetaData'
+import Loader from '../Layout/Loader'
 import { AdminLayout, PageHeader, IconAction, cardSx, dataGridSx, gridProps, idCellSx } from './AdminUI'
 
 const ProductReviews = () => {
     const [reviews, setReviews] = useState([])
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState('')
+    const [deletingReviewId, setDeletingReviewId] = useState(null)
     const initialLoadStarted = useRef(false)
 
     const loadReviews = useCallback(async () => {
@@ -47,6 +49,7 @@ const ProductReviews = () => {
     }, [loadReviews])
 
     const deleteReview = async (reviewId, productId) => {
+        setDeletingReviewId(reviewId)
         try {
             await axios.delete(
                 `${import.meta.env.VITE_API}/reviews?id=${reviewId}&productId=${productId}`,
@@ -56,6 +59,8 @@ const ProductReviews = () => {
             await loadReviews()
         } catch (error) {
             toast.error(error.response?.data?.message || error.message || 'Could not delete the review.', { position: 'bottom-right' })
+        } finally {
+            setDeletingReviewId(null)
         }
     }
 
@@ -106,6 +111,8 @@ const ProductReviews = () => {
                     icon="fa-trash"
                     title="Delete review"
                     tone="danger"
+                    loading={deletingReviewId === params.row.id}
+                    disabled={Boolean(deletingReviewId)}
                 />
             ),
         },
@@ -136,7 +143,7 @@ const ProductReviews = () => {
                 <Paper variant="outlined" sx={{ ...cardSx, p: 0, overflow: 'hidden' }}>
                     {loading ? (
                         <Box sx={{ p: 5, textAlign: 'center' }}>
-                            <Typography color="text.secondary">Loading reviews…</Typography>
+                            <Loader size={28} fullScreen={false} />
                         </Box>
                     ) : rows.length > 0 ? (
                         <DataGrid rows={rows} columns={columns} getRowId={(row) => row.id} sx={dataGridSx} {...gridProps} />

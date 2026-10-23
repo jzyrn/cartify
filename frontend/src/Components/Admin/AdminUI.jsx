@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { Box, IconButton, Paper, Tooltip, Typography } from '@mui/material'
-import Loader from '../Layout/Loader'
+import Loader, { ActionLoader } from '../Layout/Loader'
 import Sidebar from './SideBar'
 
 export const GREEN = '#17332a'
@@ -61,7 +61,7 @@ export const fieldSx = {
     '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: GOLD },
 }
 
-export const IconAction = ({ to, onClick, icon, title, tone = 'green' }) => {
+export const IconAction = ({ to, onClick, icon, title, tone = 'green', disabled = false, loading = false }) => {
     const tones = {
         green: { bg: '#eef3f0', color: GREEN, hbg: GREEN, hcolor: GOLD },
         danger: { bg: '#fdecea', color: '#b3261e', hbg: '#b3261e', hcolor: '#fff' },
@@ -73,12 +73,13 @@ export const IconAction = ({ to, onClick, icon, title, tone = 'green' }) => {
             <IconButton
                 size="small"
                 {...linkProps}
+                disabled={disabled || loading}
                 sx={{
                     width: 32, height: 32, borderRadius: 2, bgcolor: t.bg, color: t.color,
                     '&:hover': { bgcolor: t.hbg, color: t.hcolor },
                 }}
             >
-                <i className={`fa ${icon}`} style={{ fontSize: 14 }} />
+                {loading ? <ActionLoader size={20} color={tone === 'danger' ? '#b3261e' : GREEN} /> : <i className={`fa ${icon}`} style={{ fontSize: 14 }} />}
             </IconButton>
         </Tooltip>
     )

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 
-import Loader from '../Layout/Loader'
+import { ActionLoader } from '../Layout/Loader'
 import MetaData from '../Layout/MetaData'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
@@ -69,6 +69,7 @@ const Login = () => {
     const [loginError, setLoginError] = useState('')
     const [notice, setNotice] = useState('')
     const [socialLoading, setSocialLoading] = useState(false)
+    const [loginSubmitting, setLoginSubmitting] = useState(false)
     const navigate = useNavigate()
     const location = useLocation()
     const dispatch = useDispatch()
@@ -77,10 +78,16 @@ const Login = () => {
         defaultValues: { email: '', password: '' },
     })
 
-    const submitHandler = ({ email, password }) => {
+    const submitHandler = async ({ email, password }) => {
         setLoginError('')
         setNotice('')
-        dispatch(login(email, password))
+        if (loginSubmitting) return
+        setLoginSubmitting(true)
+        try {
+            await dispatch(login(email, password))
+        } finally {
+            setLoginSubmitting(false)
+        }
     }
 
     // sends the token to our backend, which sets the same login cookie as the normal login
@@ -108,6 +115,7 @@ const Login = () => {
             setNotice('Google sign-in is not set up yet (the VITE_FIREBASE_* values are missing).')
             return
         }
+        setSocialLoading(true)
         try {
             const result = await signInWithPopup(auth, googleProvider)
             const idToken = await result.user.getIdToken()
@@ -125,6 +133,8 @@ const Login = () => {
                 'auth/network-request-failed': 'Network error. Check your internet connection.',
             }
             setLoginError(messages[err.code] || `Google sign-in failed (${err.code || err.message}).`)
+        } finally {
+            setSocialLoading(false)
         }
     }
 
@@ -159,18 +169,16 @@ const Login = () => {
             variant="outlined"
             fullWidth
             onClick={onClick}
-            disabled={socialLoading}
-            startIcon={<FacebookF />}
+            disabled={socialLoading || loading}
+            startIcon={socialLoading ? <ActionLoader size={16} /> : <FacebookF />}
             sx={socialBtnSx}
         >
-            CONTINUE WITH FACEBOOK
+            {socialLoading ? 'CONNECTING…' : 'CONTINUE WITH FACEBOOK'}
         </Button>
     )
 
     return (
         <>
-            {loading ? <Loader /> : (
-                <>
                     <MetaData title={'Login'} />
 
                     <section className="auth-page">
@@ -251,6 +259,7 @@ const Login = () => {
                                         type="submit"
                                         variant="contained"
                                         fullWidth
+                                        disabled={loading || loginSubmitting || socialLoading}
                                         sx={{
                                             bgcolor: GREEN,
                                             color: GOLD,
@@ -260,7 +269,7 @@ const Login = () => {
                                             '&:hover': { bgcolor: '#12241c' },
                                         }}
                                     >
-                                        SIGN IN
+                                        {loginSubmitting ? <><ActionLoader size={18} color={GOLD} />Signing in…</> : 'SIGN IN'}
                                     </Button>
                                 </form>
 
@@ -277,11 +286,11 @@ const Login = () => {
                                         variant="outlined"
                                         fullWidth
                                         onClick={googleHandler}
-                                        disabled={socialLoading}
-                                        startIcon={<GoogleG />}
+                                        disabled={socialLoading || loading}
+                                        startIcon={socialLoading ? <ActionLoader size={16} /> : <GoogleG />}
                                         sx={socialBtnSx}
                                     >
-                                        CONTINUE WITH GOOGLE
+                                        {socialLoading ? 'CONNECTING…' : 'CONTINUE WITH GOOGLE'}
                                     </Button>
 
                                     {/* Facebook: react-facebook-login package */}
@@ -309,8 +318,6 @@ const Login = () => {
                             </div>
                         </div>
                     </section>
-                </>
-            )}
         </>
     )
 }

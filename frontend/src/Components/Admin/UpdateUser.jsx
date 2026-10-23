@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
+import { ActionLoader } from '../Layout/Loader'
 import { AdminLayout, PageHeader, primaryBtnSx, fieldSx, cardSx } from './AdminUI'
 import { updateUser, getUserDetails, clearErrors } from '../../actions/userActions'
 import { UPDATE_USER_RESET } from '../../constants/userConstants'
@@ -14,7 +15,7 @@ const UpdateUser = () => {
     const dispatch = useDispatch()
     let navigate = useNavigate()
 
-    const { error, isUpdated } = useSelector(state => state.user)
+    const { error, isUpdated, loading: updating } = useSelector(state => state.user)
     const { user } = useSelector(state => state.userDetails)
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
@@ -85,8 +86,8 @@ const UpdateUser = () => {
                         <option value="admin">admin</option>
                     </TextField>
 
-                    <Button type="submit" fullWidth size="large" disableElevation sx={primaryBtnSx}>
-                        Update
+                    <Button type="submit" fullWidth size="large" disableElevation disabled={updating} sx={primaryBtnSx}>
+                        {updating ? <><ActionLoader size={20} color="#fff" />Updating…</> : 'Update'}
                     </Button>
                 </Paper>
             </AdminLayout>

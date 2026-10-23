@@ -13,7 +13,7 @@ import { DELETE_USER_RESET } from '../../constants/userConstants'
 const UsersList = () => {
     const dispatch = useDispatch()
     const { loading, error, users } = useSelector(state => state.allUsers)
-    const { isDeleted } = useSelector(state => state.user)
+    const { isDeleted, loading: deleting } = useSelector(state => state.user)
 
     const errMsg = (message = '') => toast.error(message, { position: 'bottom-right' })
     const successMsg = (message = '') => toast.success(message, { position: 'bottom-right' })
@@ -61,7 +61,7 @@ const UsersList = () => {
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <IconAction to={`/admin/user/${params.id}`} icon="fa-pencil" title="Edit" />
-                    <IconAction onClick={() => deleteUserHandler(params.id)} icon="fa-trash" title="Delete" tone="danger" />
+                    <IconAction onClick={() => deleteUserHandler(params.id)} icon="fa-trash" title="Delete" tone="danger" loading={deleting} />
                 </Box>
             ),
         },

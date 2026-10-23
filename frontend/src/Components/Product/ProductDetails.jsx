@@ -4,7 +4,7 @@ import { Container, Row, Col } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { Alert, Box, Button, Paper, Rating, TextField, Typography } from "@mui/material";
-import Loader from "../Layout/Loader";
+import Loader, { ActionLoader } from "../Layout/Loader";
 import MetaData from "../Layout/MetaData";
 import { getProductDetails, clearErrors, newReview, getReviewEligibility } from "../../actions/productActions";
 import { addItemToCart } from "../../actions/cartActions";
@@ -24,6 +24,7 @@ export default function ProductDetails() {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
   const reviews = product.reviews || [];
   const userReview = reviews.find((review) =>
     String(review.user?._id || review.user) === String(user?._id)
@@ -80,7 +81,7 @@ export default function ProductDetails() {
 
   const hasShades = product.shades && product.shades.length > 0;
 
-  const addToCartHandler = () => {
+  const addToCartHandler = async () => {
     if (!isAuthenticated) {
       toast.info("Please log in to add items to your cart", { position: "bottom-right" });
       navigate(`/login?redirect=/product/${product._id}`);
@@ -90,8 +91,16 @@ export default function ProductDetails() {
     if (hasShades && !shade) {
       return toast.error("Please choose a shade", { position: "bottom-right" });
     }
-    dispatch(addItemToCart(product._id, quantity, shade));
-    toast.success("Cart updated", { position: "bottom-right" });
+    if (addingToCart) return;
+    setAddingToCart(true);
+    try {
+      const added = await dispatch(addItemToCart(product._id, quantity, shade));
+      if (added) toast.success("Cart updated", { position: "bottom-right" });
+    } catch (requestError) {
+      toast.error(requestError.response?.data?.message || "Could not update your cart.", { position: "bottom-right" });
+    } finally {
+      setAddingToCart(false);
+    }
   };
 
   const submitReviewHandler = async (event) => {
@@ -184,8 +193,8 @@ export default function ProductDetails() {
                   <span>{quantity}</span>
                   <button type="button" onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}>+</button>
                 </div>
-                <button type="button" className="cartify-btn primary" onClick={addToCartHandler}>
-                  Add to Cart
+                <button type="button" className="cartify-btn primary" onClick={addToCartHandler} disabled={addingToCart}>
+                  {addingToCart ? <><ActionLoader size={20} color="#fff" />Adding…</> : "Add to Cart"}
                 </button>
               </div>
             )}
@@ -230,7 +239,7 @@ export default function ProductDetails() {
                   sx={{ mb: 2 }}
                 />
                 <Button type="submit" variant="contained" disabled={submittingReview} sx={{ bgcolor: "#1a3329", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#12241c" } }}>
-                  {submittingReview ? "Saving…" : userReview ? "Update review" : "Submit review"}
+                  {submittingReview ? <><ActionLoader size={20} color="#fff" />Saving…</> : userReview ? "Update review" : "Submit review"}
                 </Button>
               </Box>
             ) : (

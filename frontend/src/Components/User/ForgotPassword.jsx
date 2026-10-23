@@ -4,7 +4,7 @@ import { Container, Row, Col, Form, Button } from "react-bootstrap";
 import axios from "axios";
 import { toast } from "react-toastify";
 import MetaData from "../Layout/MetaData";
-import Loader from "../Layout/Loader";
+import { ActionLoader } from "../Layout/Loader";
 import { API_BASE_URL } from "../Utils/Helpers";
 
 export default function ForgotPassword() {
@@ -41,7 +41,7 @@ export default function ForgotPassword() {
               </Form.Group>
 
               <Button type="submit" className="shop-cta w-100 py-2" disabled={loading}>
-                {loading ? <Loader size={22} fullScreen={false} /> : "SEND EMAIL"}
+                {loading ? <ActionLoader size={18} color="#17332a" /> : "SEND EMAIL"}
               </Button>
 
               <p className="mt-3 mb-0 text-center"><Link to="/login">Back to login</Link></p>

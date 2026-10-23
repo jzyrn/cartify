@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Navbar, Container, NavDropdown } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -7,6 +7,7 @@ import Search from "./Search";
 import cartifyLogo from "../../assets/cartify_logo.png";
 import { logout } from "../../actions/userActions";
 import { clearCart } from "../../actions/cartActions";
+import { ActionLoader } from "./Loader";
 
 /* shared look for every icon in the bar: same size, white, no underline */
 const iconLinkStyle = {
@@ -31,14 +32,21 @@ export function Header() {
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
   const { cartItems } = useSelector((state) => state.cart);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const logoutHandler = async () => {
-    await dispatch(logout());
-    dispatch(clearCart());
-    localStorage.removeItem("cartItems");
-    localStorage.removeItem("shippingInfo");
-    toast.success("Logged out", { position: "bottom-right" });
-    navigate("/login");
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await dispatch(logout());
+      dispatch(clearCart());
+      localStorage.removeItem("cartItems");
+      localStorage.removeItem("shippingInfo");
+      toast.success("Logged out", { position: "bottom-right" });
+      navigate("/login");
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -119,10 +127,11 @@ export function Header() {
                 <button
                   type="button"
                   onClick={logoutHandler}
+                  disabled={loggingOut}
                   style={iconLinkStyle}
                   title="Logout"
                 >
-                  <i className="fa fa-sign-out" style={iconStyle} />
+                  {loggingOut ? <ActionLoader size={20} color="#fff" /> : <i className="fa fa-sign-out" style={iconStyle} />}
                 </button>
               )}
             </div>

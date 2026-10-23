@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
+import { ActionLoader } from '../Layout/Loader'
 import { AdminLayout, PageHeader, PageLoader, InfoRow, StatusPill, primaryBtnSx, fieldSx, cardSx, GREEN, GOLD } from './AdminUI'
 import { getOrderDetails, updateOrder, clearErrors } from '../../actions/orderActions'
 import { UPDATE_ORDER_RESET } from '../../constants/orderConstants'
@@ -16,7 +17,7 @@ const STATUS_FLOW = ['Pending', 'Processing', 'Shipped', 'Delivered']
 const ProcessOrder = () => {
     const dispatch = useDispatch()
     const { loading, order = {} } = useSelector(state => state.orderDetails)
-    const { error, isUpdated } = useSelector(state => state.order)
+    const { error, isUpdated, loading: updating } = useSelector(state => state.order)
 
     const [status, setStatus] = useState('')
     let navigate = useNavigate()
@@ -134,8 +135,8 @@ const ProcessOrder = () => {
                                     <MenuItem value="Delivered" disabled={currentStatusIndex >= 3}>Delivered</MenuItem>
                                 </TextField>
 
-                                <Button fullWidth disableElevation disabled={!status} sx={primaryBtnSx} onClick={() => updateOrderHandler(order._id)}>
-                                    Update Status
+                                <Button fullWidth disableElevation disabled={!status || updating} sx={primaryBtnSx} onClick={() => updateOrderHandler(order._id)}>
+                                    {updating ? <><ActionLoader size={20} color="#fff" />Updating…</> : 'Update Status'}
                                 </Button>
                             </Paper>
                         </Box>

@@ -19,7 +19,7 @@ const statusTone = (status = '') => {
 const OrdersList = () => {
     const dispatch = useDispatch()
     const { loading, error, orders } = useSelector(state => state.allOrders)
-    const { isDeleted } = useSelector(state => state.order)
+    const { isDeleted, loading: deleting } = useSelector(state => state.order)
 
     const errMsg = (message = '') => toast.error(message, { position: 'bottom-right' })
     const successMsg = (message = '') => toast.success(message, { position: 'bottom-right' })
@@ -66,7 +66,7 @@ const OrdersList = () => {
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <IconAction to={`/admin/order/${params.id}`} icon="fa-eye" title="View / process" />
-                    <IconAction onClick={() => deleteOrderHandler(params.id)} icon="fa-trash" title="Delete" tone="danger" />
+                    <IconAction onClick={() => deleteOrderHandler(params.id)} icon="fa-trash" title="Delete" tone="danger" loading={deleting} />
                 </Box>
             ),
         },

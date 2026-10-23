@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import MetaData from "../Layout/MetaData";
+import { ActionLoader } from "../Layout/Loader";
 import { addItemToCart, removeItemFromCart } from "../../actions/cartActions";
 
 const GREEN = "#17332a";
@@ -31,21 +32,28 @@ const Cart = () => {
   const navigate = useNavigate();
   const { cartItems } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
+  const [pendingItem, setPendingItem] = React.useState(null);
 
-  const increaseQty = (item) => {
+  const increaseQty = async (item) => {
+    if (pendingItem) return;
     const newQty = item.quantity + 1;
     if (newQty > item.stock) return;
-    dispatch(addItemToCart(item.product, newQty, item.shade));
+    setPendingItem(item.product);
+    try { await dispatch(addItemToCart(item.product, newQty, item.shade)); } finally { setPendingItem(null); }
   };
 
-  const decreaseQty = (item) => {
+  const decreaseQty = async (item) => {
+    if (pendingItem) return;
     const newQty = item.quantity - 1;
     if (newQty <= 0) return;
-    dispatch(addItemToCart(item.product, newQty, item.shade));
+    setPendingItem(item.product);
+    try { await dispatch(addItemToCart(item.product, newQty, item.shade)); } finally { setPendingItem(null); }
   };
 
-  const removeHandler = (item) => {
-    dispatch(removeItemFromCart(item.product, item.shade));
+  const removeHandler = async (item) => {
+    if (pendingItem) return;
+    setPendingItem(item.product);
+    try { await dispatch(removeItemFromCart(item.product, item.shade)); } finally { setPendingItem(null); }
   };
 
   const checkoutHandler = () => {
@@ -200,11 +208,11 @@ const Cart = () => {
                       <IconButton
                         size="small"
                         onClick={() => decreaseQty(item)}
-                        disabled={item.quantity <= 1}
+                        disabled={item.quantity <= 1 || Boolean(pendingItem)}
                         aria-label="Decrease quantity"
                         sx={{ width: 32, height: 32, color: GREEN, fontSize: 18 }}
                       >
-                        −
+                        {pendingItem === item.product ? <ActionLoader size={20} /> : "−"}
                       </IconButton>
                       <Typography sx={{ minWidth: 28, textAlign: "center" }} fontWeight={600}>
                         {item.quantity}
@@ -212,23 +220,24 @@ const Cart = () => {
                       <IconButton
                         size="small"
                         onClick={() => increaseQty(item)}
-                        disabled={item.quantity >= item.stock}
+                        disabled={item.quantity >= item.stock || Boolean(pendingItem)}
                         aria-label="Increase quantity"
                         sx={{ width: 32, height: 32, color: GREEN, fontSize: 18 }}
                       >
-                        +
+                        {pendingItem === item.product ? <ActionLoader size={16} /> : "+"}
                       </IconButton>
                     </Box>
 
                     <Tooltip title="Remove">
                       <Button
                         onClick={() => removeHandler(item)}
+                        disabled={Boolean(pendingItem)}
                         aria-label="Remove item"
                         color="error"
                         size="small"
                         sx={{ gridArea: "remove", justifySelf: "end", textTransform: "none" }}
                       >
-                        Remove
+                        {pendingItem === item.product ? <ActionLoader size={20} /> : "Remove"}
                       </Button>
                     </Tooltip>
                   </Card>

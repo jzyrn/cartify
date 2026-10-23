@@ -122,6 +122,11 @@ export default function Search() {
                 "&:hover fieldset": { borderColor: GOLD },
                 "&.Mui-focused fieldset": { borderColor: GOLD },
               },
+              "& .MuiAutocomplete-endAdornment .MuiCircularProgress-root": {
+                color: GREEN,
+                width: "18px !important",
+                height: "18px !important",
+              },
               borderRadius: "8px 0 0 8px",
             }}
           />

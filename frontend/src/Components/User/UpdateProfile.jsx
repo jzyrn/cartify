@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import MetaData from "../Layout/MetaData";
-import Loader from "../Layout/Loader";
+import { ActionLoader } from "../Layout/Loader";
 import { updateProfile, loadUser, clearErrors } from "../../actions/userActions";
 import { UPDATE_PROFILE_RESET } from "../../constants/userConstants";
 import { profileSchema } from "../../validation/schemas";
@@ -98,7 +98,7 @@ export default function UpdateProfile() {
               </Form.Group>
 
               <Button type="submit" className="shop-cta w-100 py-2" disabled={loading}>
-                {loading ? <Loader size={22} fullScreen={false} /> : "UPDATE"}
+                {loading ? <ActionLoader size={18} color="#17332a" /> : "UPDATE"}
               </Button>
             </Form>
           </Col>

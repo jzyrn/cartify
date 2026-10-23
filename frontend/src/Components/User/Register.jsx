@@ -8,7 +8,7 @@ import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
 import InputAdornment from "@mui/material/InputAdornment";
 import MetaData from "../Layout/MetaData";
-import Loader from "../Layout/Loader";
+import { ActionLoader } from "../Layout/Loader";
 import { register, clearErrors } from "../../actions/userActions";
 
 const GREEN = "#1a3329";
@@ -157,7 +157,7 @@ export default function Register() {
                   "&.Mui-disabled": { bgcolor: "#6b7d74", color: "#e8e1c4" },
                 }}
               >
-                {loading ? <Loader size={22} fullScreen={false} /> : "REGISTER"}
+                {loading ? <ActionLoader size={18} color={GOLD} /> : "REGISTER"}
               </Button>
 
               <p className="mt-3 mb-0 text-center">
