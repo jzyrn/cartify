@@ -63,17 +63,41 @@ const run = async () => {
     const productIds = [...new Set(orders.flatMap(order =>
         (order.orderItems || []).map(item => String(item.product))
     ))]
-    const products = await Product.find({ _id: { $in: productIds } })
+    const products = await Product.find({
+        $or: [
+            { _id: { $in: productIds } },
+            { name: { $in: orders.flatMap(order => (order.orderItems || []).map(item => item.name)) } },
+        ],
+    })
     const productsById = new Map(products.map(product => [String(product._id), product]))
+    const productsByName = new Map()
+    for (const product of products) {
+        const key = String(product.name || '').trim().toLowerCase()
+        productsByName.set(key, [...(productsByName.get(key) || []), product])
+    }
     const reviewedPairs = new Set()
     let added = 0
     let skippedExisting = 0
     let missingProducts = 0
+    let repairedOrderItems = 0
+    let ambiguousProducts = 0
 
     for (const order of orders) {
         if (!order.user) continue
+        let orderChanged = false
         for (const item of order.orderItems || []) {
-            const product = productsById.get(String(item.product))
+            let product = productsById.get(String(item.product))
+            if (!product) {
+                const matchingProducts = productsByName.get(String(item.name || '').trim().toLowerCase()) || []
+                if (matchingProducts.length === 1) {
+                    product = matchingProducts[0]
+                    item.product = product._id
+                    orderChanged = true
+                    repairedOrderItems += 1
+                } else if (matchingProducts.length > 1) {
+                    ambiguousProducts += 1
+                }
+            }
             if (!product) {
                 missingProducts += 1
                 continue
@@ -101,13 +125,16 @@ const run = async () => {
             recalculateProduct(product)
             added += 1
         }
+        if (orderChanged) await order.save()
     }
 
     for (const product of products) {
         if (product.isModified()) await product.save()
     }
     console.log(`Found ${orders.length} delivered order(s); added ${added} review(s).`)
+    if (repairedOrderItems > 0) console.log(`Repaired ${repairedOrderItems} order item reference(s) by matching a unique product name.`)
     if (skippedExisting > 0) console.log(`Skipped ${skippedExisting} customer/product pair(s) that already have a review.`)
+    if (ambiguousProducts > 0) console.log(`Skipped ${ambiguousProducts} orphaned item(s) because multiple products share the same name.`)
     if (missingProducts > 0) console.log(`Skipped ${missingProducts} order item(s) whose product no longer exists.`)
     console.log('Re-running will not duplicate reviews.')
 }

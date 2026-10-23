@@ -1,6 +1,6 @@
 // backend/seeder.js
-// Run from the backend folder:  node seeder.js        (adds the products)
-//                               node seeder.js -d     (deletes all products)
+// Run from the backend folder:  node prodseeder.js        (upserts the catalog)
+//                               node prodseeder.js -d     (deletes all products)
 const mongoose = require('mongoose')
 const dotenv = require('dotenv')
 const Product = require('./models/product')
@@ -85,19 +85,44 @@ const products = [
 const seedProducts = async () => {
     try {
         await mongoose.connect(process.env.DB_LOCAL_URI)
-        await Product.deleteMany()
-        console.log('Products deleted')
 
         if (process.argv.includes('-d')) {
-            process.exit()
+            const result = await Product.deleteMany()
+            console.log(`${result.deletedCount} products deleted`)
+            return
         }
 
-        await Product.insertMany(products)
-        console.log(`${products.length} products added`)
-        process.exit()
+        const operations = products.map(product => ({
+            updateOne: {
+                // Keep the same MongoDB _id so existing order item references remain valid.
+                filter: { name: product.name, brand: product.brand },
+                update: {
+                    $set: {
+                        name: product.name,
+                        brand: product.brand,
+                        category: product.category,
+                        price: product.price,
+                        description: product.description,
+                        shades: product.shades,
+                    },
+                    // Defaults apply only to new catalog entries; reseeding won't reset stock/images/reviews.
+                    $setOnInsert: {
+                        stock: product.stock,
+                        ratings: product.ratings,
+                        numOfReviews: 0,
+                        images: product.images,
+                    },
+                },
+                upsert: true,
+            },
+        }))
+        const result = await Product.bulkWrite(operations)
+        console.log(`Catalog synced: ${result.upsertedCount} added, ${result.modifiedCount} updated; existing product IDs preserved.`)
     } catch (error) {
         console.log(error.message)
-        process.exit(1)
+        process.exitCode = 1
+    } finally {
+        await mongoose.disconnect()
     }
 }
 
