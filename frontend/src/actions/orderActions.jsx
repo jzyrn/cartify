@@ -73,6 +73,25 @@ export const myOrders = () => async (dispatch) => {
     }
 }
 
+export const cancelCustomerOrder = async (id) => {
+    try {
+        const { data } = await axios.put(
+            `${import.meta.env.VITE_API}/order/${id}/cancel`,
+            {},
+            { withCredentials: true }
+        )
+        return data
+    } catch (error) {
+        const message = error.response?.status === 404
+            ? 'Cancel endpoint not found. Restart the backend and try again.'
+            : error.response?.data?.message || error.message || 'Could not cancel this order.'
+        return {
+            success: false,
+            message,
+        }
+    }
+}
+
 export const getOrderDetails = (id) => async (dispatch) => {
     try {
         dispatch({ type: ORDER_DETAILS_REQUEST });

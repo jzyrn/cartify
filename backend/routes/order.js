@@ -5,6 +5,7 @@ const {
     newOrder,
     getSingleOrder,
     myOrders,
+    cancelOrder,
     allOrders,
     updateOrder,
     deleteOrder,
@@ -19,6 +20,7 @@ const { isAuthenticatedUser, authorizeRoles } = require('../middleware/auth')
 // customer
 router.post('/order/new', isAuthenticatedUser, newOrder)
 router.get('/orders/me', isAuthenticatedUser, myOrders)
+router.put('/order/:id/cancel', isAuthenticatedUser, cancelOrder)
 router.get('/order/:id', isAuthenticatedUser, getSingleOrder)
 
 // admin

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Box, Button, Chip, Container, Paper, Tab, Tabs, Typography } from '@mui/material'
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
 import AllInboxOutlinedIcon from '@mui/icons-material/AllInboxOutlined'
 import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined'
 import AutorenewOutlinedIcon from '@mui/icons-material/AutorenewOutlined'
@@ -10,12 +11,14 @@ import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined'
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import Swal from 'sweetalert2'
 import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
+import { ActionLoader } from '../Layout/Loader'
 import { PageHeader, PageLoader, primaryBtnSx, cardSx } from '../Admin/AdminUI'
 import { formatOrderNumber } from '../Cart/checkoutUtils'
-import { myOrders, clearErrors } from '../../actions/orderActions'
+import { myOrders, clearErrors, cancelCustomerOrder } from '../../actions/orderActions'
 
 const statusTone = (status = '') => {
     const normalized = status === 'Preparing' ? 'Processing' : status
@@ -48,6 +51,7 @@ const ListOrders = () => {
     const dispatch = useDispatch()
     const { loading, error, orders } = useSelector(state => state.myOrders)
     const [activeStage, setActiveStage] = useState('All')
+    const [cancellingOrderId, setCancellingOrderId] = useState(null)
 
     // fetch once when the page opens
     useEffect(() => {
@@ -78,6 +82,29 @@ const ListOrders = () => {
     const formatDate = (date) => date
         ? new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
         : 'Date unavailable'
+
+    const handleCancelOrder = async (order) => {
+        const confirmation = await Swal.fire({
+            title: 'Cancel this order?',
+            text: 'You can only cancel an order while it is pending.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Cancel order',
+            cancelButtonText: 'Keep order',
+            confirmButtonColor: '#17332a',
+        })
+        if (!confirmation.isConfirmed) return
+
+        setCancellingOrderId(order._id)
+        const result = await cancelCustomerOrder(order._id)
+        if (result.success) {
+            toast.success('Order cancelled.', { position: 'bottom-right' })
+            await dispatch(myOrders())
+        } else {
+            toast.error(result.message || 'Could not cancel this order.', { position: 'bottom-right' })
+        }
+        setCancellingOrderId(null)
+    }
 
     return (
         <>
@@ -186,15 +213,44 @@ const ListOrders = () => {
                                             )}
                                         </Box>
 
-                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'space-between', md: 'flex-end' }, gap: 2, flexWrap: 'wrap' }}>
-                                            <Box>
+                                        <Box sx={{
+                                            display: 'grid',
+                                            gridTemplateColumns: { xs: 'minmax(72px, 1fr) 100px', md: '90px 100px 108px 108px' },
+                                            alignItems: 'center',
+                                            justifyContent: { md: 'end' },
+                                            columnGap: { xs: 1, sm: 1.5 },
+                                            rowGap: 1,
+                                        }}>
+                                            <Box sx={{ width: { md: 90 } }}>
                                                 <Typography variant="caption" color="text.secondary" display="block">Total</Typography>
                                                 <Typography fontWeight={700}>₱{Number(order.totalPrice || 0).toLocaleString()}</Typography>
                                             </Box>
-                                            <Chip label={normalizedStatus(status)} color={statusColor} size="small" />
-                                            <Button component={Link} to={`/order/${order._id}`} variant="outlined" size="small" sx={{ borderColor: '#1a3329', color: '#1a3329', textTransform: 'none', fontWeight: 600 }}>
-                                                View order
+                                            <Chip label={normalizedStatus(status)} color={statusColor} size="small" sx={{ width: 100, justifySelf: 'center' }} />
+                                            <Button
+                                                component={Link}
+                                                to={activeStage === 'ToRate' && items[0]?.product
+                                                    ? `/product/${items[0].product}#reviews`
+                                                    : `/order/${order._id}`}
+                                                variant="outlined"
+                                                size="small"
+                                                sx={{ width: 108, minWidth: 108, borderColor: '#1a3329', color: '#1a3329', textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+                                            >
+                                                {activeStage === 'ToRate' ? 'Rate product' : 'View order'}
                                             </Button>
+                                            {normalizedStatus(status) === 'Pending' && (
+                                                <Button
+                                                    onClick={() => handleCancelOrder(order)}
+                                                    variant="outlined"
+                                                    size="small"
+                                                    color="error"
+                                                    startIcon={<CancelOutlinedIcon />}
+                                                    disabled={cancellingOrderId === order._id}
+                                                    sx={{ width: 108, minWidth: 108, textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+                                                >
+                                                    {cancellingOrderId === order._id ? <><ActionLoader size={20} />Cancelling…</> : 'Cancel'}
+                                                </Button>
+                                            )}
+                                            {normalizedStatus(status) !== 'Pending' && <Box aria-hidden="true" sx={{ width: 108, height: 1 }} />}
                                         </Box>
                                     </Box>
                                 </Paper>
