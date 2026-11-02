@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Container, Row, Col } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
+import axios from "axios";
 import { toast } from "react-toastify";
 import {
   Button,
@@ -18,17 +19,20 @@ import Alert from "@mui/material/Alert";
 import Rating from "@mui/material/Rating";
 import Fab from "@mui/material/Fab";
 import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Divider from "@mui/material/Divider";
 import MetaData from "./Layout/MetaData";
 import Loader from "./Layout/Loader";
 import { ActionLoader } from "./Layout/Loader";
 import { getProducts } from "../actions/productActions";
 import { addItemToCart } from "../actions/cartActions";
 import cartifyHero from "../assets/cartify_hero_cosmetics.png";
+import ProductImageCarousel from "./Product/ProductImageCarousel";
 
 const categories = [
   "Foundation",
@@ -58,6 +62,8 @@ export default function Home() {
   const [price, setPrice] = useState([1, 1000]); // applied filter (triggers a fetch)
   const [sliderValue, setSliderValue] = useState([1, 1000]); // what the slider shows while dragging
   const [minimumRating, setMinimumRating] = useState(0);
+  const [brandOptions, setBrandOptions] = useState([]);
+  const [selectedBrands, setSelectedBrands] = useState([]);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [selectedShade, setSelectedShade] = useState("");
   const [selectedQuantity, setSelectedQuantity] = useState(1);
@@ -82,14 +88,26 @@ export default function Home() {
           : rating >= minimumRating && rating < minimumRating + 1;
       });
 
+  useEffect(() => {
+    let active = true;
+    axios.get(`${import.meta.env.VITE_API}/product-brands`)
+      .then(({ data }) => {
+        if (active) setBrandOptions(data.brands || []);
+      })
+      .catch(() => {
+        // Keep the storefront usable if brand options cannot be loaded.
+      });
+    return () => { active = false; };
+  }, []);
+
   // fetch a page whenever the page or a filter changes
   useEffect(() => {
-    const filterKey = `${keyword || ""}|${activeCategory}|${price[0]}-${price[1]}|${minimumRating}`;
+    const filterKey = `${keyword || ""}|${activeCategory}|${price[0]}-${price[1]}|${minimumRating}|${selectedBrands.join(",")}`;
 
     if (prevFilterKey.current !== null && prevFilterKey.current !== filterKey) {
-      // a filter changed: start over from page 1 with an empty list
+      // A filter changed: request page 1, but keep the current cards in place
+      // until the response arrives so the page and footer do not jump upward.
       prevFilterKey.current = filterKey;
-      setAllProducts([]);
       if (currentPage !== 1) {
         setCurrentPage(1); // this effect runs again with page 1
         return;
@@ -103,10 +121,18 @@ export default function Home() {
         keyword,
         price,
         activeCategory === "All" ? "" : activeCategory,
-        minimumRating
+        minimumRating,
+        selectedBrands
       )
     );
-  }, [dispatch, currentPage, keyword, activeCategory, price, minimumRating]);
+  }, [dispatch, currentPage, keyword, activeCategory, price, minimumRating, selectedBrands]);
+
+  const toggleBrand = (brand) => {
+    setSelectedBrands((current) => current.includes(brand)
+      ? current.filter((selected) => selected !== brand)
+      : [...current, brand]
+    );
+  };
 
   // when a page arrives, replace the list (page 1) or add to it (page 2, 3, ...)
   useEffect(() => {
@@ -187,15 +213,7 @@ export default function Home() {
     <Col key={p._id} sm={6} lg={4} className="mb-4">
       <div className="shop-card">
         <div className="shop-card-image">
-          {p.images && p.images.length > 0 ? (
-            <img
-              src={p.images[0].url}
-              alt={p.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            <i className="fa fa-shopping-bag" />
-          )}
+          <ProductImageCarousel images={p.images} alt={p.name} />
         </div>
         <div className="shop-card-body">
           <p className="shop-card-category">{p.category}</p>
@@ -310,31 +328,12 @@ export default function Home() {
         <Loader />
       ) : (
         <section className="shop-products" id="featured-products">
-          <Container>
-            <div className="shop-section-heading">
-              <h2>{keyword ? `Results for "${keyword}"` : "Featured products"}</h2>
-            </div>
-
-            <Paper
-              variant="outlined"
-              sx={{
-                p: { xs: 2, sm: 2.5 },
-                mb: 4,
-                borderColor: "#e5e2d9",
-                borderRadius: 2,
-                boxShadow: "0 5px 18px rgba(26, 51, 41, 0.04)",
-              }}
+          <div style={{ position: "relative" }}>
+            <Box
+              component="aside"
+              className="shop-filter-sidebar"
+              aria-label="Product filters"
             >
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 1fr) 240px" },
-                  columnGap: { xs: 2, sm: 5 },
-                  rowGap: 2,
-                  alignItems: "center",
-                }}
-              >
-                <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ color: GREEN, fontWeight: 700, mb: 0.25 }}>
                     Price range
                   </Typography>
@@ -350,96 +349,117 @@ export default function Home() {
                     getAriaValueText={valuetext}
                     min={1}
                     max={1000}
-                    sx={{ color: GREEN, mt: 1, mb: 0, "& .MuiSlider-thumb": { border: `2px solid ${GOLD}` } }}
+                    sx={{ color: GREEN, mt: 1, mb: 1, "& .MuiSlider-thumb": { border: `2px solid ${GOLD}` } }}
                   />
-                </Box>
-                <FormControl size="small" fullWidth>
-                  <InputLabel id="review-rating-filter-label">Customer rating</InputLabel>
-                  <Select
-                    labelId="review-rating-filter-label"
-                    id="review-rating-filter"
-                    value={minimumRating}
-                    label="Customer rating"
-                    onChange={(event) => setMinimumRating(Number(event.target.value))}
-                    sx={{ borderRadius: 1.5, "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: GREEN } }}
-                  >
-                    <MenuItem value={0}>All reviews</MenuItem>
-                    {[4, 3, 2, 1].map((rating) => (
-                      <MenuItem key={rating} value={rating}>
-                        <Rating value={rating} readOnly size="small" />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            </Paper>
 
-            {/* MUI Alerts for errors and empty results */}
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                Could not load products: {error}
-              </Alert>
-            )}
-
-            {!error && !loading && visibleProducts.length === 0 && (
-              <Alert severity="info" sx={{ mb: 3 }}>
-                {minimumRating > 0
-                  ? `No ${minimumRating}-star reviews found.`
-                  : "No products found. Try a different category or price range."}
-              </Alert>
-            )}
-
-            {loading && allProducts.length === 0 && (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                <Loader size={28} fullScreen={false} />
-              </Box>
-            )}
-
-            <Row>{visibleProducts.map(renderCard)}</Row>
-
-            {/* infinite scroll footer */}
-            <div ref={sentinelRef} className="text-center my-4">
-              {loading && allProducts.length > 0 && (
-                <Loader size={28} fullScreen={false} />
-              )}
-
-              {!loading && !hasMore && allProducts.length > 0 && (
-                <>
-                  <Alert severity="success" sx={{ display: "inline-flex", mb: 2 }}>
-                    You've reached the end.
-                  </Alert>
-                  <div>
-                    <Fab
-                      size="small"
-                      aria-label="Back to top"
-                      title="Back to top"
-                      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                      sx={{
-                        bgcolor: GREEN,
-                        color: GOLD,
-                        "&:hover": { bgcolor: "#12241c" },
-                      }}
+                  <FormControl size="small" fullWidth sx={{ mt: 1, mb: 2 }}>
+                    <InputLabel id="review-rating-filter-label">Customer rating</InputLabel>
+                    <Select
+                      labelId="review-rating-filter-label"
+                      id="review-rating-filter"
+                      value={minimumRating}
+                      label="Customer rating"
+                      onChange={(event) => setMinimumRating(Number(event.target.value))}
+                      sx={{ borderRadius: 1.5, "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: GREEN } }}
                     >
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M12 19V5" />
-                        <path d="M5 12l7-7 7 7" />
-                      </svg>
-                    </Fab>
-                  </div>
-                </>
-              )}
-            </div>
-          </Container>
+                      <MenuItem value={0}>All reviews</MenuItem>
+                      {[5, 4, 3, 2, 1].map((rating) => (
+                        <MenuItem key={rating} value={rating}>
+                          <Rating value={rating} readOnly size="small" />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <Divider sx={{ mb: 1.5 }} />
+                  <Typography sx={{ color: GREEN, fontWeight: 700, mb: 0.5 }}>Brands</Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column" }}>
+                    {brandOptions.map((brand) => (
+                      <FormControlLabel
+                        key={brand}
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={selectedBrands.includes(brand)}
+                            onChange={() => toggleBrand(brand)}
+                            sx={{ color: GREEN, "&.Mui-checked": { color: GREEN }, py: 0.4 }}
+                          />
+                        }
+                        label={<Typography variant="body2">{brand}</Typography>}
+                        sx={{ m: 0, minHeight: 34 }}
+                      />
+                    ))}
+                    {brandOptions.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">No brands available.</Typography>
+                    )}
+                  </Box>
+                  {selectedBrands.length > 0 && (
+                    <Button
+                      size="small"
+                      onClick={() => setSelectedBrands([])}
+                      sx={{ mt: 1, color: GREEN, textTransform: "none" }}
+                    >
+                      Clear brands
+                    </Button>
+                  )}
+            </Box>
+
+            <Container>
+                <div className="shop-section-heading">
+                  <h2>{keyword ? `Results for "${keyword}"` : "Featured products"}</h2>
+                </div>
+
+                {/* MUI Alerts for errors and empty results */}
+                {error && (
+                  <Alert severity="error" sx={{ mb: 3 }}>
+                    Could not load products: {error}
+                  </Alert>
+                )}
+
+                {!error && !loading && visibleProducts.length === 0 && (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    {minimumRating > 0
+                      ? `No products with a ${minimumRating}-star average rating found.`
+                      : "No products found. Try a different category, brand, or price range."}
+                  </Alert>
+                )}
+
+                {loading && allProducts.length === 0 && (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                    <Loader size={28} fullScreen={false} />
+                  </Box>
+                )}
+
+                <Row>{visibleProducts.map(renderCard)}</Row>
+
+                {/* infinite scroll footer */}
+                <div ref={sentinelRef} className="text-center my-4">
+                  {loading && allProducts.length > 0 && <Loader size={28} fullScreen={false} />}
+
+                  {!loading && !hasMore && allProducts.length > 0 && (
+                    <>
+                      <Alert severity="success" sx={{ display: "inline-flex", mb: 2 }}>
+                        You've reached the end.
+                      </Alert>
+                      <div>
+                        <Fab
+                          size="small"
+                          aria-label="Back to top"
+                          title="Back to top"
+                          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                          sx={{ bgcolor: GREEN, color: GOLD, "&:hover": { bgcolor: "#12241c" } }}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M12 19V5" />
+                            <path d="M5 12l7-7 7 7" />
+                          </svg>
+                        </Fab>
+                      </div>
+                    </>
+                  )}
+                </div>
+            </Container>
+          </div>
         </section>
       )}
 
@@ -488,16 +508,7 @@ export default function Home() {
                     color: GREEN,
                   }}
                 >
-                  {quickViewProduct.images?.[0]?.url ? (
-                    <Box
-                      component="img"
-                      src={quickViewProduct.images[0].url}
-                      alt={quickViewProduct.name}
-                      sx={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  ) : (
-                    <i className="fa fa-shopping-bag" aria-hidden="true" />
-                  )}
+                  <ProductImageCarousel images={quickViewProduct.images} alt={quickViewProduct.name} />
                 </Box>
                 <Box>
                   <Typography variant="overline" sx={{ color: "text.secondary", lineHeight: 1.5 }}>

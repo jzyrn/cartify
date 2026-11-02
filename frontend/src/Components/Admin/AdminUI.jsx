@@ -20,9 +20,9 @@ export const AdminLayout = ({ children }) => (
     </Box>
 )
 
-export const PageHeader = ({ title, subtitle, action }) => (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-        <Box>
+export const PageHeader = ({ title, subtitle, action, centered = false }) => (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: centered ? 'center' : 'space-between', gap: 2 }}>
+        <Box sx={{ textAlign: centered ? 'center' : 'left' }}>
             <Typography variant="h4" fontWeight={700} sx={{ color: GREEN }}>
                 {title}
             </Typography>

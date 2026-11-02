@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react'
-import { Box, Paper } from '@mui/material'
+import React, { useEffect, useState } from 'react'
+import { Box, MenuItem, Paper, Select } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -7,13 +7,15 @@ import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
 import { AdminLayout, PageHeader, PageLoader, IconAction, StatusPill, cardSx, dataGridSx, gridProps, idCellSx } from './AdminUI'
-import { allUsers, deleteUser, clearErrors } from '../../actions/userActions'
+import { allUsers, deleteUser, updateUserStatus, clearErrors } from '../../actions/userActions'
 import { DELETE_USER_RESET } from '../../constants/userConstants'
 
 const UsersList = () => {
     const dispatch = useDispatch()
     const { loading, error, users } = useSelector(state => state.allUsers)
     const { isDeleted, loading: deleting } = useSelector(state => state.user)
+    const currentUser = useSelector(state => state.auth.user)
+    const [updatingStatusId, setUpdatingStatusId] = useState(null)
 
     const errMsg = (message = '') => toast.error(message, { position: 'bottom-right' })
     const successMsg = (message = '') => toast.success(message, { position: 'bottom-right' })
@@ -36,6 +38,27 @@ const UsersList = () => {
         dispatch(deleteUser(id))
     }
 
+    const statusHandler = async (id, isActive) => {
+        if (updatingStatusId || String(id) === String(currentUser?._id)) return
+        setUpdatingStatusId(id)
+        try {
+            const updatedUser = await updateUserStatus(id, isActive)
+            toast.success(`${updatedUser.name}'s account ${isActive ? 'activated' : 'deactivated'}.`, { position: 'bottom-right' })
+            dispatch(allUsers())
+        } catch (statusError) {
+            const message = statusError.response?.data?.message
+                || (statusError.response?.status === 404
+                    ? 'User update route was not found. Check that the frontend is connected to the Cartify backend.'
+                    : statusError.code === 'ERR_NETWORK'
+                    ? 'Cannot reach the server. Check that the backend is running and restart it to load the account-status route.'
+                    : statusError.message)
+                || 'Could not update account status.'
+            toast.error(message, { position: 'bottom-right' })
+        } finally {
+            setUpdatingStatusId(null)
+        }
+    }
+
     const columns = [
         {
             field: 'id',
@@ -51,6 +74,27 @@ const UsersList = () => {
             headerName: 'Role',
             width: 110,
             renderCell: (params) => <StatusPill label={params.value} tone={params.value === 'admin' ? 'gold' : 'neutral'} />,
+        },
+        {
+            field: 'isActive',
+            headerName: 'Status',
+            width: 150,
+            sortable: false,
+            renderCell: (params) => (
+                <Select
+                    size="small"
+                    value={params.value ? 'active' : 'deactivated'}
+                    renderValue={() => params.value ? 'Active' : 'Deactivated'}
+                    onChange={(event) => statusHandler(params.id, event.target.value === 'activate')}
+                    disabled={updatingStatusId !== null || String(params.id) === String(currentUser?._id)}
+                    inputProps={{ 'aria-label': `Account status for ${params.row.name}` }}
+                    sx={{ minWidth: 132, fontSize: 13, bgcolor: params.value ? '#e8f4ed' : '#fce8e6', '& .MuiOutlinedInput-notchedOutline': { border: 0 } }}
+                >
+                    {params.value
+                        ? <MenuItem value="deactivate">Deactivate</MenuItem>
+                        : <MenuItem value="activate">Activate</MenuItem>}
+                </Select>
+            ),
         },
         {
             field: 'actions',
@@ -72,6 +116,7 @@ const UsersList = () => {
         name: user.name,
         email: user.email,
         role: user.role,
+        isActive: user.isActive !== false,
     }))
 
     return (

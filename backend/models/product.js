@@ -48,6 +48,10 @@ const productSchema = new mongoose.Schema({
                 min: 1,
                 max: 5
             },
+            variant: {
+                type: String,
+                default: ''
+            },
             comment: {
                 type: String,
                 required: true,

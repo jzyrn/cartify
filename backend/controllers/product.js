@@ -2,47 +2,73 @@ const Product = require('../models/product')
 const Order = require('../models/order')
 const cloudinary = require('cloudinary')
 const APIFeatures = require('../utils/apiFeatures');
+const { maskReviewText, maskReviewComments, maskProductReviews } = require('../utils/reviewFilter')
 
-exports.newProduct = async (req, res, next) => {
-    let images = []
-    if (typeof req.body.images === 'string') {
-        images.push(req.body.images)
-    } else if (Array.isArray(req.body.images)) {
-        images = req.body.images
-    }
+const maskProductReviewsWithPurchasedVariants = async (product) => {
+    const productData = typeof product.toObject === 'function' ? product.toObject() : { ...product }
+    const orders = await Order.find({
+        orderStatus: 'Delivered',
+        'orderItems.product': productData._id,
+    }).select('user orderItems').sort({ deliveredAt: -1, createdAt: -1 })
 
-    let imagesLinks = [];
-
-    for (let i = 0; i < images.length; i++) {
-        try {
-            const result = await cloudinary.v2.uploader.upload(images[i], {
-                folder: 'products',
-                width: 150,
-                crop: "scale",
-            });
-
-            imagesLinks.push({
-                public_id: result.public_id,
-                url: result.secure_url
-            })
-
-        } catch (error) {
-            console.log(error)
+    const variantsByUser = new Map()
+    for (const order of orders) {
+        for (const item of order.orderItems || []) {
+            const userId = String(order.user)
+            if (
+                String(item.product) === String(productData._id) &&
+                item.shade &&
+                !variantsByUser.has(userId)
+            ) {
+                variantsByUser.set(userId, item.shade)
+            }
         }
     }
 
-    req.body.images = imagesLinks
+    productData.reviews = (productData.reviews || []).map((review) => {
+        const reviewData = typeof review.toObject === 'function' ? review.toObject() : { ...review }
+        reviewData.variant = reviewData.variant || variantsByUser.get(String(reviewData.user)) || ''
+        return reviewData
+    })
+
+    return maskProductReviews(productData)
+}
+
+exports.newProduct = async (req, res, next) => {
     try {
+        const uploadedFiles = req.files || []
+        let images = uploadedFiles.map(file => file.path)
+
+        // Keep accepting existing base64 image data from older clients.
+        if (!images.length && typeof req.body.images === 'string') {
+            images = [req.body.images]
+        } else if (!images.length && Array.isArray(req.body.images)) {
+            images = req.body.images
+        }
+
+        const imagesLinks = []
+        for (const image of images) {
+            const result = await cloudinary.v2.uploader.upload(image, {
+                folder: 'products',
+                resource_type: 'image',
+            })
+            imagesLinks.push({
+                public_id: result.public_id,
+                url: result.secure_url,
+            })
+        }
+
+        req.body.images = imagesLinks
         const product = await Product.create(req.body);
 
         return res.status(201).json({
             success: true,
-            product
+            product: maskProductReviews(product)
         })
     } catch (err) {
         return res.status(400).json({
             success: false,
-            message: err.message
+            message: `Unable to create product: ${err.message}`
         })
     }
 }
@@ -57,7 +83,7 @@ exports.getSingleProduct = async (req, res, next) => {
     }
     return res.status(200).json({
         success: true,
-        product
+        product: await maskProductReviewsWithPurchasedVariants(product)
     })
 }
 
@@ -80,7 +106,7 @@ exports.getProducts = async (req, res) => {
         return res.status(400).json({ message: 'error loading products' })
     return res.status(200).json({
         success: true,
-        products,
+        products: products.map(maskProductReviews),
         filteredProductsCount,
         resPerPage,
         productsCount,
@@ -98,6 +124,11 @@ exports.getProducts = async (req, res) => {
     // })
 }
 
+exports.getProductBrands = async (req, res) => {
+    const brands = await Product.distinct('brand');
+    return res.status(200).json({ success: true, brands: brands.filter(Boolean).sort((a, b) => a.localeCompare(b)) });
+}
+
 exports.updateProduct = async (req, res, next) => {
     try {
         let product = await Product.findById(req.params.id);
@@ -110,37 +141,59 @@ exports.updateProduct = async (req, res, next) => {
         }
 
         const uploadedFiles = req.files || []
-        let images = []
-        if (uploadedFiles.length > 0) {
-            images = uploadedFiles.map(file => file.path)
-        } else if (typeof req.body.images === 'string') {
-            images.push(req.body.images)
-        } else if (Array.isArray(req.body.images)) {
-            images = req.body.images
+        let newImages = uploadedFiles.map(file => file.path)
+        if (!newImages.length && typeof req.body.images === 'string') {
+            newImages = [req.body.images]
+        } else if (!newImages.length && Array.isArray(req.body.images)) {
+            newImages = req.body.images
         }
 
-        if (images.length > 0) {
-            let imagesLinks = [];
-            for (let i = 0; i < images.length; i++) {
-                const result = await cloudinary.v2.uploader.upload(images[i], {
+        const hasExistingImages = req.body.existingImages !== undefined
+        let requestedImageIds = []
+        if (hasExistingImages) {
+            try {
+                requestedImageIds = typeof req.body.existingImages === 'string'
+                    ? JSON.parse(req.body.existingImages)
+                    : req.body.existingImages
+            } catch {
+                return res.status(400).json({ success: false, message: 'Existing product images are invalid.' })
+            }
+            if (!Array.isArray(requestedImageIds) || requestedImageIds.some(imageId => typeof imageId !== 'string')) {
+                return res.status(400).json({ success: false, message: 'Existing product images are invalid.' })
+            }
+        }
+        delete req.body.existingImages
+
+        if (newImages.length > 0 || hasExistingImages) {
+            const requested = new Set(requestedImageIds)
+            const retainedImages = hasExistingImages
+                ? (product.images || []).filter(image => requested.has(typeof image === 'string' ? image : image.public_id || image.url))
+                : []
+            const uploadedImageLinks = []
+            for (const image of newImages) {
+                const result = await cloudinary.v2.uploader.upload(image, {
                     folder: 'products',
                     width: 150,
-                    crop: "scale",
+                    crop: 'scale',
                 });
-                imagesLinks.push({
+                uploadedImageLinks.push({
                     public_id: result.public_id,
                     url: result.secure_url
                 })
             }
 
-            for (let i = 0; i < (product.images || []).length; i++) {
-                try {
-                    await cloudinary.v2.uploader.destroy(product.images[i].public_id)
-                } catch (error) {
-                    console.log(error)
+            const retainedIds = new Set(retainedImages.map(image => typeof image === 'string' ? image : image.public_id || image.url))
+            for (const image of product.images || []) {
+                const imageId = typeof image === 'string' ? image : image.public_id || image.url
+                if (!retainedIds.has(imageId) && typeof image !== 'string' && image.public_id) {
+                    try {
+                        await cloudinary.v2.uploader.destroy(image.public_id)
+                    } catch (error) {
+                        console.log(error)
+                    }
                 }
             }
-            req.body.images = imagesLinks
+            req.body.images = [...retainedImages, ...uploadedImageLinks]
         } else {
             delete req.body.images
         }
@@ -153,7 +206,7 @@ exports.updateProduct = async (req, res, next) => {
 
         return res.status(200).json({
             success: true,
-            product
+            product: maskProductReviews(product)
         })
     } catch (err) {
         return res.status(500).json({
@@ -178,6 +231,21 @@ exports.deleteProduct = async (req, res, next) => {
     })
 }
 
+// DELETE /admin/products/bulk  body: { ids: string[] }
+exports.bulkDeleteProducts = async (req, res) => {
+    const { ids } = req.body || {}
+    if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => typeof id !== 'string' || !/^[a-f\d]{24}$/i.test(id))) {
+        return res.status(400).json({ success: false, message: 'Provide one or more valid product IDs.' })
+    }
+
+    try {
+        const result = await Product.deleteMany({ _id: { $in: [...new Set(ids)] } })
+        return res.status(200).json({ success: true, deletedCount: result.deletedCount })
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message || 'Could not delete selected products.' })
+    }
+}
+
 exports.getAdminProducts = async (req, res, next) => {
 
     const products = await Product.find();
@@ -189,7 +257,7 @@ exports.getAdminProducts = async (req, res, next) => {
     }
     return res.status(200).json({
         success: true,
-        products
+        products: products.map(maskProductReviews)
     })
 
 }
@@ -197,7 +265,7 @@ exports.getAdminProducts = async (req, res, next) => {
 exports.createProductReview = async (req, res, next) => {
     const { rating, comment, productId } = req.body
     const numericRating = Number(rating)
-    const cleanComment = typeof comment === 'string' ? comment.trim() : ''
+    const cleanComment = typeof comment === 'string' ? maskReviewText(comment.trim()) : ''
 
     if (!productId || !Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5 || !cleanComment) {
         return res.status(400).json({ success: false, message: 'Please provide a rating from 1 to 5 and a review comment.' })
@@ -208,14 +276,19 @@ exports.createProductReview = async (req, res, next) => {
         return res.status(404).json({ success: false, message: 'Product not found.' })
     }
 
-    const hasDeliveredPurchase = await Order.exists({
+    const deliveredOrder = await Order.findOne({
         user: req.user._id,
         orderStatus: 'Delivered',
         'orderItems.product': product._id,
-    })
-    if (!hasDeliveredPurchase) {
+    }).sort({ deliveredAt: -1, createdAt: -1 })
+    if (!deliveredOrder) {
         return res.status(403).json({ success: false, message: 'You can review this product after one of your orders containing it has been delivered.' })
     }
+
+    const purchasedItem = (deliveredOrder.orderItems || []).find(
+        item => String(item.product) === String(product._id)
+    )
+    const purchasedVariant = purchasedItem?.shade || ''
 
     product.reviews = product.reviews || []
     const existingReview = product.reviews.find(
@@ -225,6 +298,7 @@ exports.createProductReview = async (req, res, next) => {
     if (existingReview) {
         existingReview.comment = cleanComment
         existingReview.rating = numericRating
+        existingReview.variant = purchasedVariant
         existingReview.name = req.user.name
         existingReview.isSeeded = false
     } else {
@@ -232,6 +306,7 @@ exports.createProductReview = async (req, res, next) => {
             user: req.user._id,
             name: req.user.name,
             rating: numericRating,
+            variant: purchasedVariant,
             comment: cleanComment,
         })
     }
@@ -245,7 +320,7 @@ exports.createProductReview = async (req, res, next) => {
     return res.status(200).json({
         success: true,
         message: existingReview ? 'Your review was updated.' : 'Your review was added.',
-        product,
+        product: maskProductReviews(product),
     })
 }
 
@@ -278,7 +353,7 @@ exports.getProductReviews = async (req, res, next) => {
     }
     res.status(200).json({
         success: true,
-        reviews: product.reviews
+        reviews: maskReviewComments(product.reviews)
     })
 }
 

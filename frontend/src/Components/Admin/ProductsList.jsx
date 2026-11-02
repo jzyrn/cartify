@@ -10,8 +10,9 @@ import { useDispatch, useSelector } from 'react-redux'
 import MetaData from '../Layout/MetaData'
 import { ActionLoader } from '../Layout/Loader'
 import { AdminLayout, PageHeader, PageLoader, IconAction, StatusPill, primaryBtnSx, cardSx, dataGridSx, gridProps, idCellSx } from './AdminUI'
-import { getAdminProducts, deleteProduct, clearErrors } from '../../actions/productActions'
+import { getAdminProducts, deleteProduct, bulkDeleteProducts, clearErrors } from '../../actions/productActions'
 import { DELETE_PRODUCT_RESET } from '../../constants/productConstants'
+import ProductImageCarousel from '../Product/ProductImageCarousel'
 
 const ProductsList = () => {
     const dispatch = useDispatch()
@@ -47,7 +48,7 @@ const ProductsList = () => {
 
     const rows = products.map(product => ({
         id: product._id,
-        image: product.images?.[0]?.url,
+        images: product.images || [],
         name: product.name,
         brand: product.brand || '—',
         price: `₱${product.price}`,
@@ -75,11 +76,13 @@ const ProductsList = () => {
 
         setBulkDeleting(true)
         try {
-            await Promise.all(selectedIds.map(id => dispatch(deleteProduct(id))))
-            toast.success(`${selectedIds.length} product${selectedIds.length === 1 ? '' : 's'} deleted successfully`, { position: 'bottom-right' })
+            const result = await dispatch(bulkDeleteProducts(selectedIds))
+            toast.success(`${result.deletedCount} product${result.deletedCount === 1 ? '' : 's'} deleted successfully`, { position: 'bottom-right' })
             setSelection({ type: 'include', ids: new Set() })
             dispatch({ type: DELETE_PRODUCT_RESET })
             dispatch(getAdminProducts())
+        } catch (deleteError) {
+            toast.error(deleteError.response?.data?.message || 'Could not delete the selected products.', { position: 'bottom-right' })
         } finally {
             setBulkDeleting(false)
         }
@@ -94,22 +97,16 @@ const ProductsList = () => {
             renderCell: (params) => <Box component="span" sx={idCellSx}>{params.value}</Box>,
         },
         {
-            field: 'image',
+            field: 'images',
             headerName: 'Image',
-            width: 90,
+            width: 110,
             sortable: false,
             filterable: false,
-            renderCell: (params) =>
-                params.value ? (
-                    <Box
-                        component="img"
-                        src={params.value}
-                        alt="product"
-                        sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 2, border: '1px solid #e3e9e5' }}
-                    />
-                ) : (
-                    <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: '#eef3f0' }} />
-                ),
+            renderCell: (params) => (
+                <Box sx={{ width: 72, height: 58, borderRadius: 1.5, overflow: 'hidden', border: '1px solid #e3e9e5' }}>
+                    <ProductImageCarousel images={params.value} alt={params.row.name} compact />
+                </Box>
+            ),
         },
         { field: 'name', headerName: 'Name', flex: 1, minWidth: 160 },
         { field: 'brand', headerName: 'Brand', width: 160 },

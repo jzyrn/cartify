@@ -31,7 +31,7 @@ import {
     CLEAR_ERRORS
 } from '../constants/productConstants';
 
-export const getProducts = (currentPage = 1, keyword = '', price, category = '', minimumRating = 0) => async (dispatch) => {
+export const getProducts = (currentPage = 1, keyword = '', price, category = '', minimumRating = 0, brands = []) => async (dispatch) => {
     try {
         dispatch({
             type: ALL_PRODUCTS_REQUEST
@@ -45,6 +45,7 @@ export const getProducts = (currentPage = 1, keyword = '', price, category = '',
         })
         if (category) params.set('category', category)
         if (minimumRating > 0) params.set('rating', minimumRating)
+        if (brands.length) params.set('brand', brands.join(','))
         const link = `${import.meta.env.VITE_API}/products?${params.toString()}`
         const { data } = await axios.get(link)
         console.log(data)
@@ -150,6 +151,14 @@ export const deleteProduct = (id) => async (dispatch) => {
             payload: error.response.data.message
         })
     }
+}
+
+export const bulkDeleteProducts = (ids) => async () => {
+    const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/products/bulk`, {
+        data: { ids },
+        withCredentials: true,
+    })
+    return data
 }
 
 export const newReview = (reviewData) => async (dispatch) => {

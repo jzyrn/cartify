@@ -362,6 +362,24 @@
   padding: 70px 0;
 }
 
+.shop-filter-sidebar {
+  position: static;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 24px;
+  padding: 0 8px;
+}
+
+@media (min-width: 1800px) {
+  .shop-filter-sidebar {
+    position: absolute;
+    top: 0;
+    left: 8px;
+    width: 240px;
+    margin-bottom: 0;
+  }
+}
+
 .shop-section-heading {
   display: flex;
   justify-content: space-between;

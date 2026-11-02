@@ -80,6 +80,7 @@ const run = async () => {
     let skippedExisting = 0
     let missingProducts = 0
     let repairedOrderItems = 0
+    let repairedVariants = 0
     let ambiguousProducts = 0
 
     for (const order of orders) {
@@ -110,6 +111,11 @@ const run = async () => {
             product.reviews = product.reviews || []
             const existing = product.reviews.find(review => String(review.user) === String(order.user._id))
             if (existing) {
+                // Refresh only seeded reviews; never alter a customer's own review.
+                if (existing.isSeeded && !existing.variant && item.shade) {
+                    existing.variant = item.shade
+                    repairedVariants += 1
+                }
                 skippedExisting += 1
                 continue // Never replace a customer's real review.
             }
@@ -119,6 +125,7 @@ const run = async () => {
                 user: order.user._id,
                 name: order.user.name || 'Cartify Customer',
                 rating: ratingFor(index),
+                variant: item.shade || '',
                 comment: COMMENTS[index % COMMENTS.length],
                 isSeeded: true,
             })
@@ -133,6 +140,7 @@ const run = async () => {
     }
     console.log(`Found ${orders.length} delivered order(s); added ${added} review(s).`)
     if (repairedOrderItems > 0) console.log(`Repaired ${repairedOrderItems} order item reference(s) by matching a unique product name.`)
+    if (repairedVariants > 0) console.log(`Added purchased variants to ${repairedVariants} existing seeded review(s).`)
     if (skippedExisting > 0) console.log(`Skipped ${skippedExisting} customer/product pair(s) that already have a review.`)
     if (ambiguousProducts > 0) console.log(`Skipped ${ambiguousProducts} orphaned item(s) because multiple products share the same name.`)
     if (missingProducts > 0) console.log(`Skipped ${missingProducts} order item(s) whose product no longer exists.`)

@@ -3,11 +3,12 @@ import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { Container, Row, Col } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { Alert, Box, Button, Paper, Rating, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, FormControl, InputLabel, MenuItem, Paper, Rating, Select, TextField, Typography } from "@mui/material";
 import Loader, { ActionLoader } from "../Layout/Loader";
 import MetaData from "../Layout/MetaData";
 import { getProductDetails, clearErrors, newReview, getReviewEligibility } from "../../actions/productActions";
 import { addItemToCart } from "../../actions/cartActions";
+import ProductImageCarousel from "./ProductImageCarousel";
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -22,10 +23,14 @@ export default function ProductDetails() {
   const [canReview, setCanReview] = useState(false);
   const [checkingReviewAccess, setCheckingReviewAccess] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
+  const [reviewRatingFilter, setReviewRatingFilter] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
   const reviews = product.reviews || [];
+  const visibleReviews = reviewRatingFilter === 0
+    ? reviews
+    : reviews.filter((review) => Number(review.rating) === reviewRatingFilter);
   const userReview = reviews.find((review) =>
     String(review.user?._id || review.user) === String(user?._id)
   );
@@ -143,11 +148,7 @@ export default function ProductDetails() {
         <Row className="mt-3">
           <Col md={5} className="mb-4">
             <div className="cartify-details-image">
-              {product.images && product.images.length > 0 ? (
-                <img src={product.images[0].url} alt={product.name} />
-              ) : (
-                <i className="fa fa-shopping-bag" />
-              )}
+              <ProductImageCarousel images={product.images} alt={product.name} />
             </div>
           </Col>
 
@@ -248,17 +249,45 @@ export default function ProductDetails() {
           </Paper>
 
           <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderColor: "#e2e8e4", borderRadius: 2 }}>
-            <Typography variant="h6" fontWeight={700} sx={{ color: "#1a3329", mb: 2 }}>
-              Customer reviews
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap", mb: 2 }}>
+              <Typography variant="h6" fontWeight={700} sx={{ color: "#1a3329" }}>
+                Customer reviews
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel id="customer-review-rating-filter-label">Rating</InputLabel>
+                <Select
+                  labelId="customer-review-rating-filter-label"
+                  id="customer-review-rating-filter"
+                  value={reviewRatingFilter}
+                  label="Rating"
+                  onChange={(event) => setReviewRatingFilter(Number(event.target.value))}
+                >
+                  <MenuItem value={0}>All ratings</MenuItem>
+                  {[5, 4, 3, 2, 1].map((rating) => (
+                    <MenuItem key={rating} value={rating}>
+                      <Rating value={rating} readOnly size="small" />
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
             {reviews.length === 0 ? (
               <Typography variant="body2" color="text.secondary">No reviews yet. Be the first verified customer to share your experience.</Typography>
+            ) : visibleReviews.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No {reviewRatingFilter}-star reviews yet.</Typography>
             ) : (
               <Box sx={{ maxHeight: 360, overflowY: "auto" }}>
-                {reviews.map((review) => (
+                {visibleReviews.map((review) => (
                   <Box key={review._id} sx={{ py: 1.5, borderBottom: "1px solid #eef3f0", "&:last-child": { borderBottom: 0 } }}>
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, flexWrap: "wrap" }}>
-                      <Typography fontWeight={600}>{review.name}</Typography>
+                      <Box>
+                        <Typography fontWeight={600}>{review.name}</Typography>
+                        {review.variant && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.2 }}>
+                            {review.variant}
+                          </Typography>
+                        )}
+                      </Box>
                       <Rating value={Number(review.rating || 0)} readOnly size="small" />
                     </Box>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>

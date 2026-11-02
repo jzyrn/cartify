@@ -63,6 +63,15 @@ class APIFeatures {
             priceFilter.category = queryCopy.category;
         }
 
+        // Support one or more selected brands from the storefront filters.
+        if (queryCopy.brand) {
+            const brands = (Array.isArray(queryCopy.brand) ? queryCopy.brand : String(queryCopy.brand).split(','))
+                .map(brand => brand.trim())
+                .filter(Boolean);
+            if (brands.length === 1) priceFilter.brand = brands[0];
+            else if (brands.length > 1) priceFilter.brand = { $in: brands };
+        }
+
         this.query = this.query.find(priceFilter);
         return this;
     }

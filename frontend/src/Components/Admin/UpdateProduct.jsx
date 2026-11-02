@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useFormik } from 'formik'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Autocomplete, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material'
+import { Autocomplete, Box, Button, IconButton, MenuItem, Paper, TextField, Typography } from '@mui/material'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
@@ -41,6 +41,7 @@ const UpdateProduct = () => {
     const [images, setImages] = useState([])
     const [oldImages, setOldImages] = useState([])
     const [imagesPreview, setImagesPreview] = useState([])
+    const imagesPreviewRef = useRef([])
 
     let { id } = useParams()
     let navigate = useNavigate()
@@ -67,24 +68,38 @@ const UpdateProduct = () => {
             images.forEach(image => {
                 formData.append('images', image)
             })
+            formData.set('existingImages', JSON.stringify(oldImages.map(image => image.public_id || image.url || image).filter(Boolean)))
             dispatch(updateProduct(product._id, formData))
         },
     })
 
     const onChange = e => {
         const files = Array.from(e.target.files)
-        setImagesPreview([])
-        setImages(files)
-        setOldImages([])
-        files.forEach(file => {
-            const reader = new FileReader()
-            reader.onload = () => {
-                if (reader.readyState === 2) {
-                    setImagesPreview(oldArray => [...oldArray, reader.result])
-                }
-            }
-            reader.readAsDataURL(file)
-        })
+        if (oldImages.length + images.length + files.length > 10) {
+            toast.error('A product can have up to 10 photos.', { position: 'bottom-right' })
+            e.target.value = ''
+            return
+        }
+        const previews = [...imagesPreview, ...files.map(file => URL.createObjectURL(file))]
+        imagesPreviewRef.current = previews
+        setImages(current => [...current, ...files])
+        setImagesPreview(previews)
+        e.target.value = ''
+    }
+
+    useEffect(() => () => imagesPreviewRef.current.forEach(URL.revokeObjectURL), [])
+
+    const removeImage = index => {
+        URL.revokeObjectURL(imagesPreview[index])
+        const previews = imagesPreview.filter((_, imageIndex) => imageIndex !== index)
+        imagesPreviewRef.current = previews
+        setImagesPreview(previews)
+        setImages(current => current.filter((_, imageIndex) => imageIndex !== index))
+    }
+
+    const removeExistingImage = image => {
+        const imageId = image.public_id || image.url || image
+        setOldImages(current => current.filter(existing => (existing.public_id || existing.url || existing) !== imageId))
     }
 
     useEffect(() => {
@@ -120,14 +135,17 @@ const UpdateProduct = () => {
         <>
             <MetaData title={'Update Product'} />
             <AdminLayout>
-                <PageHeader title="Update Product" subtitle="Edit the details of this product" />
+                <Box sx={{ width: '100%', maxWidth: 1000, alignSelf: 'center' }}>
+                    <PageHeader title="Update Product" centered />
+                </Box>
 
                 <Paper
                     variant="outlined"
                     component="form"
+                    noValidate
                     onSubmit={formik.handleSubmit}
                     encType="multipart/form-data"
-                    sx={{ ...cardSx, maxWidth: 760, width: '100%', display: 'flex', flexDirection: 'column', gap: 2.5 }}
+                    sx={{ ...cardSx, alignSelf: 'center', maxWidth: 1000, width: '100%', display: 'flex', flexDirection: 'column', gap: 2.5 }}
                 >
                     <TextField id="name_field" label="Name" {...formik.getFieldProps('name')} error={formik.touched.name && Boolean(formik.errors.name)} helperText={formik.touched.name && formik.errors.name} fullWidth sx={fieldSx} />
 
@@ -175,7 +193,16 @@ const UpdateProduct = () => {
                                 if (!sellerEdited.current) formik.setFieldValue('seller', value)
                             }}
                             renderInput={(params) => (
-                                <TextField {...params} id="brand_field" label="Brand" sx={fieldSx} />
+                                <TextField
+                                    {...params}
+                                    id="brand_field"
+                                    name="brand"
+                                    label="Brand"
+                                    onBlur={formik.handleBlur}
+                                    error={formik.touched.brand && Boolean(formik.errors.brand)}
+                                    helperText={formik.touched.brand && formik.errors.brand}
+                                    sx={fieldSx}
+                                />
                             )}
                         />
                     </Box>
@@ -204,12 +231,37 @@ const UpdateProduct = () => {
                             Choose Images
                             <input type="file" name="images" id="customFile" hidden multiple onChange={onChange} />
                         </Button>
+                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+                            Existing images stay with the product. New selections are added; use × to remove any image.
+                        </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 2 }}>
-                            {oldImages && oldImages.map(img => (
-                                <Box key={img.url || img} component="img" src={img.url} alt={img.url} sx={thumbSx} />
+                            {oldImages && oldImages.map((img, index) => (
+                                <Box key={img.public_id || img.url || img} sx={{ position: 'relative', width: thumbSx.width, height: thumbSx.height }}>
+                                    <Box component="img" src={img.url || img} alt={`Existing product image ${index + 1}`} sx={thumbSx} />
+                                    <IconButton
+                                        type="button"
+                                        size="small"
+                                        aria-label={`Remove existing image ${index + 1}`}
+                                        onClick={() => removeExistingImage(img)}
+                                        sx={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, bgcolor: '#fff', color: '#b3261e', border: '1px solid #e3e9e5', boxShadow: 1, '&:hover': { bgcolor: '#fdecea' } }}
+                                    >
+                                        <span aria-hidden="true" style={{ fontSize: 19, lineHeight: 1 }}>×</span>
+                                    </IconButton>
+                                </Box>
                             ))}
-                            {imagesPreview.map(img => (
-                                <Box key={img} component="img" src={img} alt="Images Preview" sx={thumbSx} />
+                            {imagesPreview.map((img, index) => (
+                                <Box key={img} sx={{ position: 'relative', width: thumbSx.width, height: thumbSx.height }}>
+                                    <Box component="img" src={img} alt={`Selected product image ${index + 1}`} sx={thumbSx} />
+                                    <IconButton
+                                        type="button"
+                                        size="small"
+                                        aria-label={`Remove selected image ${index + 1}`}
+                                        onClick={() => removeImage(index)}
+                                        sx={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, bgcolor: '#fff', color: '#b3261e', border: '1px solid #e3e9e5', boxShadow: 1, '&:hover': { bgcolor: '#fdecea' } }}
+                                    >
+                                        <span aria-hidden="true" style={{ fontSize: 19, lineHeight: 1 }}>×</span>
+                                    </IconButton>
+                                </Box>
                             ))}
                         </Box>
                     </Box>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useFormik } from 'formik'
 import { useNavigate } from 'react-router-dom'
-import { Autocomplete, Box, Button, MenuItem, Paper, TextField, Typography } from '@mui/material'
+import { Autocomplete, Box, Button, IconButton, MenuItem, Paper, TextField, Typography } from '@mui/material'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useDispatch, useSelector } from 'react-redux'
@@ -37,6 +37,7 @@ const NewProduct = () => {
 
     const [images, setImages] = useState([])
     const [imagesPreview, setImagesPreview] = useState([])
+    const imagesPreviewRef = useRef([])
 
     let navigate = useNavigate()
 
@@ -63,20 +64,28 @@ const NewProduct = () => {
         },
     })
 
+    useEffect(() => () => imagesPreviewRef.current.forEach(URL.revokeObjectURL), [])
+
     const onChange = e => {
         const files = Array.from(e.target.files)
-        setImagesPreview([])
-        setImages([])
-        files.forEach(file => {
-            const reader = new FileReader()
-            reader.onload = () => {
-                if (reader.readyState === 2) {
-                    setImagesPreview(oldArray => [...oldArray, reader.result])
-                    setImages(oldArray => [...oldArray, reader.result])
-                }
-            }
-            reader.readAsDataURL(file)
-        })
+        if (images.length + files.length > 10) {
+            toast.error('Choose up to 10 photos.', { position: 'bottom-right' })
+            e.target.value = ''
+            return
+        }
+        const previews = [...imagesPreview, ...files.map(file => URL.createObjectURL(file))]
+        imagesPreviewRef.current = previews
+        setImages(current => [...current, ...files])
+        setImagesPreview(previews)
+        e.target.value = ''
+    }
+
+    const removeImage = index => {
+        URL.revokeObjectURL(imagesPreview[index])
+        const previews = imagesPreview.filter((_, imageIndex) => imageIndex !== index)
+        imagesPreviewRef.current = previews
+        setImagesPreview(previews)
+        setImages(current => current.filter((_, imageIndex) => imageIndex !== index))
     }
 
     useEffect(() => {
@@ -100,14 +109,17 @@ const NewProduct = () => {
         <>
             <MetaData title={'New Product'} />
             <AdminLayout>
-                <PageHeader title="New Product" subtitle="Add a product to your store" />
+                <Box sx={{ width: '100%', maxWidth: 1000, alignSelf: 'center' }}>
+                    <PageHeader title="New Product" centered />
+                </Box>
 
                 <Paper
                     variant="outlined"
                     component="form"
+                    noValidate
                     onSubmit={formik.handleSubmit}
                     encType="multipart/form-data"
-                    sx={{ ...cardSx, maxWidth: 760, width: '100%', display: 'flex', flexDirection: 'column', gap: 2.5 }}
+                    sx={{ ...cardSx, alignSelf: 'center', maxWidth: 1000, width: '100%', display: 'flex', flexDirection: 'column', gap: 2.5 }}
                 >
                     <TextField id="name_field" label="Name" {...formik.getFieldProps('name')} error={formik.touched.name && Boolean(formik.errors.name)} helperText={formik.touched.name && formik.errors.name} fullWidth sx={fieldSx} />
 
@@ -155,7 +167,16 @@ const NewProduct = () => {
                                 if (!sellerEdited.current) formik.setFieldValue('seller', value)
                             }}
                             renderInput={(params) => (
-                                <TextField {...params} id="brand_field" label="Brand" sx={fieldSx} />
+                                <TextField
+                                    {...params}
+                                    id="brand_field"
+                                    name="brand"
+                                    label="Brand"
+                                    onBlur={formik.handleBlur}
+                                    error={formik.touched.brand && Boolean(formik.errors.brand)}
+                                    helperText={formik.touched.brand && formik.errors.brand}
+                                    sx={fieldSx}
+                                />
                             )}
                         />
                     </Box>
@@ -182,17 +203,30 @@ const NewProduct = () => {
                             sx={{ textTransform: 'none', borderColor: GREEN, color: GREEN, '&:hover': { borderColor: GOLD, bgcolor: '#f7eecb' } }}
                         >
                             Choose Images
-                            <input type="file" name="images" id="customFile" hidden multiple onChange={onChange} />
+                            <input type="file" name="images" id="customFile" hidden multiple accept="image/jpeg,image/png" onChange={onChange} />
                         </Button>
+                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+                            Select up to 10 JPG or PNG photos. New selections are added; use × on a preview to remove one.
+                        </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 2 }}>
-                            {imagesPreview.map(img => (
-                                <Box
-                                    key={img}
-                                    component="img"
-                                    src={img}
-                                    alt="Images Preview"
-                                    sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 2, border: '1px solid #e3e9e5' }}
-                                />
+                            {imagesPreview.map((img, index) => (
+                                <Box key={img} sx={{ position: 'relative', width: 72, height: 72 }}>
+                                    <Box
+                                        component="img"
+                                        src={img}
+                                        alt={`Selected product image ${index + 1}`}
+                                        sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 2, border: '1px solid #e3e9e5' }}
+                                    />
+                                    <IconButton
+                                        type="button"
+                                        size="small"
+                                        aria-label={`Remove selected image ${index + 1}`}
+                                        onClick={() => removeImage(index)}
+                                        sx={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, bgcolor: '#fff', color: '#b3261e', border: '1px solid #e3e9e5', boxShadow: 1, '&:hover': { bgcolor: '#fdecea' } }}
+                                    >
+                                        <span aria-hidden="true" style={{ fontSize: 19, lineHeight: 1 }}>×</span>
+                                    </IconButton>
+                                </Box>
                             ))}
                         </Box>
                     </Box>
