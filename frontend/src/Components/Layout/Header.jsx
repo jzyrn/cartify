@@ -6,7 +6,6 @@ import { toast } from "react-toastify";
 import Search from "./Search";
 import cartifyLogo from "../../assets/cartify_logo.png";
 import { logout } from "../../actions/userActions";
-import { clearCart } from "../../actions/cartActions";
 import { ActionLoader } from "./Loader";
 
 /* shared look for every icon in the bar: same size, white, no underline */
@@ -39,9 +38,6 @@ export function Header() {
     setLoggingOut(true);
     try {
       await dispatch(logout());
-      dispatch(clearCart());
-      localStorage.removeItem("cartItems");
-      localStorage.removeItem("shippingInfo");
       toast.success("Logged out", { position: "bottom-right" });
       navigate("/login");
     } finally {

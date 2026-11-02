@@ -12,7 +12,6 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@greatsumini/react-facebook-login": "^3.4.0",
     "@hookform/resolvers": "^5.2.2",
     "@mui/icons-material": "^9.5.0",
     "@mui/material": "^9.5.0",

@@ -6,7 +6,6 @@ const {
     registerUser,
     loginUser,
     firebaseLogin,
-    facebookLogin,
     logout,
     forgotPassword,
     resetPassword,
@@ -23,7 +22,6 @@ const { isAuthenticatedUser, authorizeRoles } = require('../middleware/auth')
 router.post('/register', upload.single('avatar'), registerUser)
 router.post('/login', loginUser)
 router.post('/auth/firebase', firebaseLogin)   // Google (Firebase Authentication)
-router.post('/auth/facebook', facebookLogin)   // Facebook (react-facebook-login)
 router.get('/logout', logout)
 router.post('/password/forgot', forgotPassword)
 router.put('/password/reset/:token', resetPassword)

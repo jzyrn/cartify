@@ -7,9 +7,12 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
 import InputAdornment from "@mui/material/InputAdornment";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import MetaData from "../Layout/MetaData";
 import { ActionLoader } from "../Layout/Loader";
-import { register, clearErrors } from "../../actions/userActions";
+import { register as registerUser, clearErrors } from "../../actions/userActions";
+import { registerSchema } from "../../validation/schemas";
 
 const GREEN = "#1a3329";
 const GOLD = "#c9a227";
@@ -22,14 +25,17 @@ const fieldSx = {
 };
 
 export default function Register() {
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
-  const { name, email, password, confirmPassword } = form;
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated, error, loading } = useSelector((state) => state.auth);
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(registerSchema),
+    mode: "onBlur",
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
+  });
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -43,20 +49,9 @@ export default function Register() {
     }
   }, [isAuthenticated, error, dispatch, navigate]);
 
-  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const passwordsMismatch = confirmPassword !== "" && password !== confirmPassword;
-
-  const submitHandler = (e) => {
-    e.preventDefault();
+  const submitHandler = ({ name, email, password }) => {
     setFormError("");
-
-    if (password !== confirmPassword) {
-      setFormError("Passwords do not match");
-      return;
-    }
-
-    dispatch(register({ name, email, password }));
+    dispatch(registerUser({ name, email, password }));
   };
 
   return (
@@ -65,7 +60,7 @@ export default function Register() {
       <Container className="py-5">
         <Row className="justify-content-center">
           <Col md={8} lg={5}>
-            <form className="shadow-sm p-4 bg-white rounded" onSubmit={submitHandler}>
+            <form className="shadow-sm p-4 bg-white rounded" onSubmit={handleSubmit(submitHandler)} noValidate>
               <h2 className="mb-4">Register</h2>
 
               {/* MUI Alert replaces the error toasts */}
@@ -79,10 +74,9 @@ export default function Register() {
                 id="name_field"
                 label="Name"
                 type="text"
-                name="name"
-                value={name}
-                onChange={onChange}
-                required
+                {...register("name")}
+                error={Boolean(errors.name)}
+                helperText={errors.name?.message}
                 fullWidth
                 sx={fieldSx}
               />
@@ -91,10 +85,9 @@ export default function Register() {
                 id="email_field"
                 label="Email"
                 type="email"
-                name="email"
-                value={email}
-                onChange={onChange}
-                required
+                {...register("email")}
+                error={Boolean(errors.email)}
+                helperText={errors.email?.message}
                 fullWidth
                 sx={fieldSx}
               />
@@ -103,12 +96,10 @@ export default function Register() {
                 id="password_field"
                 label="Password"
                 type={showPassword ? "text" : "password"}
-                name="password"
-                value={password}
-                onChange={onChange}
-                required
+                {...register("password", { deps: "confirmPassword" })}
+                error={Boolean(errors.password)}
                 fullWidth
-                helperText="At least 6 characters"
+                helperText={errors.password?.message || "At least 6 characters"}
                 sx={fieldSx}
                 slotProps={{
                   htmlInput: { minLength: 6 },
@@ -132,13 +123,10 @@ export default function Register() {
                 id="confirm_password_field"
                 label="Confirm Password"
                 type={showPassword ? "text" : "password"}
-                name="confirmPassword"
-                value={confirmPassword}
-                onChange={onChange}
-                required
+                {...register("confirmPassword")}
+                error={Boolean(errors.confirmPassword)}
+                helperText={errors.confirmPassword?.message || " "}
                 fullWidth
-                error={passwordsMismatch}
-                helperText={passwordsMismatch ? "Passwords do not match" : " "}
                 sx={{ ...fieldSx, mb: 3 }}
               />
 

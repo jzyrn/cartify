@@ -107,18 +107,25 @@ export const userReducer = (state = {}, action) => {
             }
         case UPDATE_PROFILE_SUCCESS:
         case UPDATE_PASSWORD_SUCCESS:
-        case UPDATE_USER_SUCCESS:
             return {
                 ...state,
                 loading: false,
                 isUpdated: action.payload
+            }
+        case UPDATE_USER_SUCCESS:
+            return {
+                ...state,
+                loading: false,
+                isUpdated: true,
+                updatedUser: action.payload
             }
         case UPDATE_PROFILE_RESET:
         case UPDATE_PASSWORD_RESET:
         case UPDATE_USER_RESET:
             return {
                 ...state,
-                isUpdated: false
+                isUpdated: false,
+                updatedUser: null
             }
         case UPDATE_PROFILE_FAIL:
         case UPDATE_PASSWORD_FAIL:

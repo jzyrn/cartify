@@ -34,7 +34,6 @@ import {
     DELETE_USER_FAIL,
     CLEAR_ERRORS
 } from '../constants/userConstants'
-import { CLEAR_CART } from '../constants/cartConstants'
 
 export const register = (userData) => async (dispatch) => {
     try {
@@ -93,11 +92,6 @@ export const logout = () => async (dispatch) => {
         await axios.get(`${import.meta.env.VITE_API}/logout`, config)
 
         dispatch({ type: LOGOUT_SUCCESS })
-
-        // the cart is saved in the browser, so empty it for the next person
-        dispatch({ type: CLEAR_CART })
-        localStorage.removeItem('cartItems')
-        localStorage.removeItem('shippingInfo')
     } catch (error) {
         dispatch({
             type: LOGOUT_FAIL,
@@ -242,7 +236,7 @@ export const updateUser = (id, userData) => async (dispatch) => {
         const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/user/${id}`, userData, config)
         dispatch({
             type: UPDATE_USER_SUCCESS,
-            payload: data.success
+            payload: data.user
         })
     } catch (error) {
         dispatch({
@@ -250,6 +244,15 @@ export const updateUser = (id, userData) => async (dispatch) => {
             payload: error.response?.data?.message || 'User update failed'
         })
     }
+}
+
+export const updateUserStatus = async (id, isActive) => {
+    const { data } = await axios.put(
+        `${import.meta.env.VITE_API}/admin/user/${id}`,
+        { isActive },
+        { withCredentials: true }
+    )
+    return data.user
 }
 
 export const deleteUser = (id) => async (dispatch) => {

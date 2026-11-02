@@ -24,6 +24,7 @@ export default function UpdateProfile() {
   const navigate = useNavigate();
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: yupResolver(profileSchema),
+    mode: "onBlur",
     defaultValues: { name: "", email: "" },
   });
 

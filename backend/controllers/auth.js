@@ -40,6 +40,9 @@ exports.loginUser = async (req, res) => {
         if (!matched) {
             return res.status(401).json({ success: false, message: 'Invalid email or password' })
         }
+        if (!user.isActive) {
+            return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact an administrator to reactivate it.' })
+        }
 
         sendToken(user, 200, res)
     } catch (err) {
@@ -48,15 +51,17 @@ exports.loginUser = async (req, res) => {
 }
 
 // ---------------------------------------------------------------------
-// SOCIAL LOGIN  (Google via Firebase, Facebook via react-facebook-login)
+// SOCIAL LOGIN (Google via Firebase)
 // ---------------------------------------------------------------------
-
-const GRAPH = 'https://graph.facebook.com'
 
 // Logs the person in. If nobody has this email yet, an account is created.
 const loginOrCreateSocial = async (res, { email, name, picture, provider, providerId }) => {
     const lowerEmail = email.toLowerCase()
     let user = await User.findOne({ email: lowerEmail })
+
+    if (user && !user.isActive) {
+        return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact an administrator to reactivate it.' })
+    }
 
     if (!user) {
         user = await User.create({
@@ -113,53 +118,6 @@ exports.firebaseLogin = async (req, res) => {
         })
     } catch (err) {
         const message = err.name === 'ValidationError' ? err.message : 'Google sign-in failed. Please try again.'
-        res.status(500).json({ success: false, message })
-    }
-}
-
-// POST /api/v1/auth/facebook   body: { accessToken }
-// token comes from the react-facebook-login package on the frontend
-exports.facebookLogin = async (req, res) => {
-    try {
-        const { accessToken } = req.body
-        if (!accessToken) {
-            return res.status(400).json({ success: false, message: 'Missing Facebook token' })
-        }
-
-        const token = encodeURIComponent(accessToken)
-
-        // make sure the token belongs to OUR Facebook app
-        const app = await fetch(`${GRAPH}/app?access_token=${token}`).then(r => r.json())
-        if (app.error || app.id !== process.env.FACEBOOK_APP_ID) {
-            return res.status(401).json({ success: false, message: 'Invalid Facebook sign-in' })
-        }
-
-        const profile = await fetch(
-            `${GRAPH}/me?fields=id,name,email,picture.type(large)&access_token=${token}`
-        ).then(r => r.json())
-
-        // ---- TEMPORARY DEBUG LOGS: remove once the email problem is solved ----
-        console.log('FB profile:', profile)
-        const perms = await fetch(`${GRAPH}/me/permissions?access_token=${token}`).then(r => r.json())
-        console.log('FB permissions:', JSON.stringify(perms))
-        // -----------------------------------------------------------------------
-
-        if (profile.error) {
-            return res.status(401).json({ success: false, message: 'Invalid Facebook sign-in' })
-        }
-        if (!profile.email) {
-            return res.status(400).json({ success: false, message: 'Facebook did not share an email address. Please sign in another way.' })
-        }
-
-        await loginOrCreateSocial(res, {
-            email: profile.email,
-            name: profile.name,
-            picture: profile.picture && profile.picture.data && profile.picture.data.url,
-            provider: 'facebook',
-            providerId: profile.id
-        })
-    } catch (err) {
-        const message = err.name === 'ValidationError' ? err.message : 'Facebook sign-in failed. Please try again.'
         res.status(500).json({ success: false, message })
     }
 }
@@ -277,6 +235,9 @@ exports.resetPassword = async (req, res) => {
         if (!user) {
             return res.status(400).json({ success: false, message: 'Reset link is invalid or has expired' })
         }
+        if (!user.isActive) {
+            return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact an administrator to reactivate it.' })
+        }
         if (!password || password !== confirmPassword) {
             return res.status(400).json({ success: false, message: 'Passwords do not match' })
         }
@@ -321,11 +282,13 @@ exports.getUserDetails = async (req, res) => {
 // PUT /api/v1/admin/user/:id
 exports.updateUser = async (req, res) => {
     try {
-        const newUserData = {
-            name: req.body.name,
-            email: req.body.email,
-            role: req.body.role
-        }
+        const newUserData = typeof req.body.isActive === 'boolean'
+            ? { isActive: req.body.isActive }
+            : {
+                name: req.body.name,
+                email: req.body.email,
+                role: req.body.role
+            }
 
         const user = await User.findByIdAndUpdate(req.params.id, newUserData, {
             new: true,
@@ -334,7 +297,7 @@ exports.updateUser = async (req, res) => {
         if (!user) {
             return res.status(404).json({ success: false, message: `User not found with id: ${req.params.id}` })
         }
-        res.status(200).json({ success: true })
+        res.status(200).json({ success: true, user })
     } catch (err) {
         res.status(400).json({ success: false, message: err.message })
     }

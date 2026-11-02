@@ -20,6 +20,20 @@ exports.isAuthenticatedUser = async (req, res, next) => {
         return res.status(401).json({ message: 'Invalid or expired token' })
     }
 
+    if (!req.user) {
+        return res.status(401).json({ message: 'Account not found. Please sign in again.' })
+    }
+    if (!req.user.isActive) {
+        const isProduction = String(process.env.NODE_ENV).toLowerCase() === 'production'
+        res.cookie('token', null, {
+            expires: new Date(0),
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+        })
+        return res.status(403).json({ message: 'Your account has been deactivated. Please contact an administrator to reactivate it.' })
+    }
+
     next()
 };
 

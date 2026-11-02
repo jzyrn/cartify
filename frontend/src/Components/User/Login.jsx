@@ -11,7 +11,6 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import axios from 'axios'
-import * as FacebookLoginPkg from '@greatsumini/react-facebook-login'   // Facebook login package (maintained fork of react-facebook-login)
 import { signInWithPopup, signOut } from 'firebase/auth'        // Google login with Firebase Authentication
 import { auth, googleProvider, firebaseConfigured } from '../../firebase'
 import { login, clearErrors, loadUser } from '../../actions/userActions'
@@ -19,12 +18,6 @@ import { loginSchema } from '../../validation/schemas'
 
 // change the file name if your image is named differently
 import loginImage from '../../assets/cartify_panel.png'
-
-// the package is CommonJS, so Vite can hand back a wrapper object instead of the component
-const FacebookLogin =
-    FacebookLoginPkg.default?.default ||
-    FacebookLoginPkg.default ||
-    FacebookLoginPkg.FacebookLogin
 
 const GREEN = '#1a3329'
 const GOLD = '#c9a227'
@@ -55,14 +48,6 @@ const GoogleG = () => (
     </svg>
 )
 
-const FacebookF = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-    </svg>
-)
-
-const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID
-
 const Login = () => {
     const { isAuthenticated, error, loading, user } = useSelector(state => state.auth)
     const [showPassword, setShowPassword] = useState(false)
@@ -75,6 +60,7 @@ const Login = () => {
     const dispatch = useDispatch()
     const { register, handleSubmit, formState: { errors } } = useForm({
         resolver: yupResolver(loginSchema),
+        mode: 'onBlur',
         defaultValues: { email: '', password: '' },
     })
 
@@ -163,19 +149,6 @@ const Login = () => {
             navigate('/login', { replace: true })
         }
     }, [location.search, navigate])
-
-    const facebookButton = (onClick) => (
-        <Button
-            variant="outlined"
-            fullWidth
-            onClick={onClick}
-            disabled={socialLoading || loading}
-            startIcon={socialLoading ? <ActionLoader size={16} /> : <FacebookF />}
-            sx={socialBtnSx}
-        >
-            {socialLoading ? 'CONNECTING…' : 'CONTINUE WITH FACEBOOK'}
-        </Button>
-    )
 
     return (
         <>
@@ -273,7 +246,7 @@ const Login = () => {
                                     </Button>
                                 </form>
 
-                                {/* OR + Google / Facebook */}
+                                {/* Google sign-in option */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
                                     <span style={{ flex: 1, height: 1, background: '#e6e4df' }} />
                                     <span style={{ fontSize: 11, letterSpacing: 1.5, color: '#9a9890' }}>OR</span>
@@ -293,21 +266,6 @@ const Login = () => {
                                         {socialLoading ? 'CONNECTING…' : 'CONTINUE WITH GOOGLE'}
                                     </Button>
 
-                                    {/* Facebook: react-facebook-login package */}
-                                    {facebookAppId && FacebookLogin ? (
-                                        <FacebookLogin
-                                            appId={facebookAppId}
-                                            scope="public_profile,email"
-                                            onSuccess={(response) => socialLogin('/auth/facebook', { accessToken: response.accessToken })}
-                                            onFail={(err) => {
-                                                console.error('Facebook login failed:', err)
-                                                setLoginError(`Facebook sign-in failed (${err?.status || 'unknown'}).`)
-                                            }}
-                                            render={({ onClick }) => facebookButton(onClick)}
-                                        />
-                                    ) : (
-                                        facebookButton(() => setNotice('Facebook sign-in is not set up yet (VITE_FACEBOOK_APP_ID is missing).'))
-                                    )}
                                 </div>
 
                                 <p style={{ fontSize: 12, color: '#8d8b84', marginTop: 20 }}>
