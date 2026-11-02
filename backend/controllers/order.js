@@ -1,5 +1,23 @@
 const Order = require('../models/order')
 const Product = require('../models/product')
+const path = require('path')
+const sendEmail = require('../utils/sendEmail')
+const createOrderReceipt = require('../utils/orderReceipt')
+
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[character]))
+
+const peso = value => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const customerStatus = status => status === 'Processing' || status === 'Preparing' ? 'Being processed' : status
+const deliveryHeading = status => ({
+    Pending: 'DELIVERY ADDRESS',
+    Processing: 'BEING PROCESSED FOR DELIVERY TO',
+    Preparing: 'BEING PROCESSED FOR DELIVERY TO',
+    Shipped: 'SHIPPED TO',
+    Delivered: 'DELIVERED TO',
+    Cancelled: 'DELIVERY ADDRESS',
+}[status] || 'DELIVERY ADDRESS')
 
 // every error goes back as { success: false, message } so the frontend can toast it
 const fail = (res, error, status) => {
@@ -136,7 +154,7 @@ exports.allOrders = async (req, res) => {
 // PUT /admin/order/:id   body: { status }
 exports.updateOrder = async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id)
+        const order = await Order.findById(req.params.id).populate('user', 'name email')
 
         if (!order) {
             return fail(res, 'No order found with this ID', 404)
@@ -179,7 +197,108 @@ exports.updateOrder = async (req, res) => {
         order.orderStatus = nextStatus
         await order.save()
 
-        res.status(200).json({ success: true })
+        let emailSent = false
+        let emailError
+        if (order.user?.email) {
+            const itemRows = (order.orderItems || []).map(item => {
+                const variant = item.shade ? escapeHtml(item.shade) : 'Standard'
+                const lineTotal = Number(item.price || 0) * Number(item.quantity || 0)
+                return `<tr>
+                    <td style="padding:14px 12px;border-bottom:1px solid #e3e9e5;color:#17332a;font-weight:700">${escapeHtml(item.name)}<div style="padding-top:4px;color:#6b7a73;font-size:12px;font-weight:400">Variant: ${variant}</div></td>
+                    <td style="padding:14px 8px;border-bottom:1px solid #e3e9e5;text-align:center;color:#33433b">${Number(item.quantity || 0)}</td>
+                    <td style="padding:14px 8px;border-bottom:1px solid #e3e9e5;text-align:right;color:#33433b;white-space:nowrap">${peso(item.price)}</td>
+                    <td style="padding:14px 12px;border-bottom:1px solid #e3e9e5;text-align:right;color:#17332a;font-weight:700;white-space:nowrap">${peso(lineTotal)}</td>
+                </tr>`
+            }).join('')
+            const itemText = (order.orderItems || []).map(item => {
+                const variant = item.shade || 'Standard'
+                return `• ${item.name}\n  Variant: ${variant} | Qty: ${item.quantity} | Unit price: ${peso(item.price)} | Line total: ${peso(Number(item.price || 0) * Number(item.quantity || 0))}`
+            }).join('\n')
+            const customerName = escapeHtml(order.user.name || 'Customer')
+            const orderNumber = escapeHtml(order._id)
+            const statusLabel = escapeHtml(customerStatus(nextStatus))
+            const ship = order.shippingInfo || {}
+            const address = [ship.address, ship.city, ship.postalCode, ship.country].filter(Boolean).map(escapeHtml).join(', ')
+            const paymentStatus = order.paymentInfo?.status === 'succeeded' || order.paymentInfo?.id?.startsWith('CARD-') ? 'Paid' : 'Pay on delivery'
+            const paymentReference = escapeHtml(order.paymentInfo?.id || 'COD')
+            const logoPath = path.join(__dirname, '../../frontend/src/assets/cartify_logo.png')
+            const html = `<div style="margin:0;padding:28px 12px;background:#f2f6f3;font-family:Arial,Helvetica,sans-serif;color:#263a31">
+              <table role="presentation" style="width:100%;max-width:720px;margin:0 auto;border-collapse:collapse;background:#ffffff;border:1px solid #e3e9e5;border-radius:12px;overflow:hidden">
+                <tr><td style="padding:22px 30px;background:#17332a;border-bottom:4px solid #c9a227">
+                  <img src="cid:cartify-logo" width="142" alt="Cartify" style="display:block;width:142px;height:auto;max-height:48px;object-fit:contain">
+                  <div style="padding-top:10px;color:#dce7e0;font-size:11px;letter-spacing:1.5px">YOUR ORDER, BEAUTIFULLY WRAPPED</div>
+                </td></tr>
+                <tr><td style="padding:30px 30px 12px">
+                  <div style="font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#8c7418">Order update</div>
+                  <h1 style="margin:8px 0 10px;font-size:25px;line-height:1.25;color:#17332a">A little update on your Cartify order</h1>
+                  <p style="margin:0 0 14px;font-size:15px;line-height:1.6">Hi ${customerName}, thank you for shopping with Cartify. We truly appreciate your order.</p>
+                  <table role="presentation" style="width:100%;border-collapse:collapse;background:#eef3f0;border-radius:8px"><tr>
+                    <td style="padding:13px 15px;font-size:13px;line-height:1.6"><span style="color:#6b7a73">Order</span><br><strong style="color:#17332a">#${orderNumber}</strong></td>
+                    <td style="padding:13px 15px;text-align:right;font-size:13px;line-height:1.6"><span style="color:#6b7a73">Current status</span><br><span style="display:inline-block;padding:4px 10px;background:#f7eecb;border-radius:14px;color:#755f12;font-weight:700">${statusLabel}</span></td>
+                  </tr></table>
+                </td></tr>
+                <tr><td style="padding:18px 30px 8px"><h2 style="margin:0;font-size:17px;color:#17332a">Your items</h2></td></tr>
+                <tr><td style="padding:0 30px">
+                  <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:#eef3f0;color:#17332a"><th style="padding:11px 12px;text-align:left">Product / variant</th><th style="padding:11px 8px;text-align:center">Qty</th><th style="padding:11px 8px;text-align:right">Unit price</th><th style="padding:11px 12px;text-align:right">Amount</th></tr></thead>
+                    <tbody>${itemRows}</tbody>
+                  </table>
+                </td></tr>
+                <tr><td style="padding:18px 30px 8px">
+                  <table role="presentation" style="width:100%;border-collapse:collapse"><tr><td style="width:50%;vertical-align:top;padding:15px;background:#f7f9f7;border:1px solid #e3e9e5">
+                    <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#6b7a73">${deliveryHeading(nextStatus)}</div>
+                    <div style="padding-top:8px;font-size:13px;line-height:1.65;color:#17332a"><strong>${customerName}</strong><br>${address}<br>${escapeHtml(ship.phoneNo || '')}<br>${escapeHtml(order.user.email)}</div>
+                  </td><td style="width:50%;vertical-align:top;padding:15px;background:#f7f9f7;border:1px solid #e3e9e5;border-left:0">
+                    <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#6b7a73">PAYMENT</div>
+                    <div style="padding-top:8px;font-size:13px;line-height:1.65;color:#17332a"><strong>${paymentStatus}</strong><br>Reference: ${paymentReference}<br>Order date: ${new Date(order.createdAt || Date.now()).toLocaleDateString('en-PH')}</div>
+                  </td></tr></table>
+                </td></tr>
+                <tr><td style="padding:8px 30px 22px">
+                  <table role="presentation" style="width:100%;max-width:340px;margin-left:auto;border-collapse:collapse;font-size:13px">
+                    <tr><td style="padding:6px 0;color:#6b7a73">Subtotal</td><td style="padding:6px 0;text-align:right">${peso(order.itemsPrice)}</td></tr>
+                    <tr><td style="padding:6px 0;color:#6b7a73">Shipping</td><td style="padding:6px 0;text-align:right">${peso(order.shippingPrice)}</td></tr>
+                    <tr><td style="padding:6px 0;color:#6b7a73">Tax</td><td style="padding:6px 0;text-align:right">${peso(order.taxPrice)}</td></tr>
+                    <tr><td style="padding:12px 0 4px;border-top:2px solid #c9a227;color:#17332a;font-size:15px;font-weight:700">Grand total</td><td style="padding:12px 0 4px;border-top:2px solid #c9a227;text-align:right;color:#17332a;font-size:17px;font-weight:700">${peso(order.totalPrice)}</td></tr>
+                  </table>
+                </td></tr>
+                <tr><td style="padding:20px 30px;background:#17332a;color:#e5eee9;text-align:center">
+                  <div style="font-size:15px;font-weight:700;color:#ffffff">Thanks for making Cartify part of your day.</div>
+                  <div style="padding-top:7px;font-size:12px;line-height:1.6">Your itemized PDF receipt is attached for your records.<br>We hope your new finds bring you joy.</div>
+                </td></tr>
+              </table>
+            </div>`
+            const text = `CARTIFY ORDER UPDATE\n${'='.repeat(42)}\n\nHi ${order.user.name || 'Customer'},\n\nThank you for shopping with Cartify. We truly appreciate your order.\n\nOrder: #${order._id}\nStatus: ${customerStatus(nextStatus)}\nDate: ${new Date(order.createdAt || Date.now()).toLocaleDateString('en-PH')}\n\nITEMS\n${'-'.repeat(42)}\n${itemText}\n\nSubtotal: ${peso(order.itemsPrice)}\nShipping: ${peso(order.shippingPrice)}\nTax: ${peso(order.taxPrice)}\nGRAND TOTAL: ${peso(order.totalPrice)}\n\n${deliveryHeading(nextStatus)}\n${order.user.name || 'Customer'}\n${[ship.address, ship.city, ship.postalCode, ship.country].filter(Boolean).join(', ')}\nPhone: ${ship.phoneNo || 'Not provided'}\nEmail: ${order.user.email}\n\nPAYMENT\n${paymentStatus} | Reference: ${order.paymentInfo?.id || 'COD'}\n\nYour itemized PDF receipt is attached for your records.\nThanks for making Cartify part of your day!`
+
+            try {
+                await sendEmail({
+                    email: order.user.email,
+                    subject: `Cartify order #${order._id} is ${nextStatus}`,
+                    text,
+                    html,
+                    attachments: [
+                        {
+                            filename: `Cartify-Receipt-${order._id}.pdf`,
+                            content: createOrderReceipt(order, order.user),
+                            contentType: 'application/pdf',
+                        },
+                        {
+                            filename: 'cartify-logo.png',
+                            path: logoPath,
+                            cid: 'cartify-logo',
+                            contentDisposition: 'inline',
+                        },
+                    ],
+                })
+                emailSent = true
+            } catch (error) {
+                emailError = error.message
+                console.error(`Order update email failed for ${order._id}: ${error.message}`)
+            }
+        } else {
+            emailError = 'Customer email address is unavailable.'
+        }
+
+        res.status(200).json({ success: true, emailSent, emailError })
     } catch (error) {
         fail(res, error)
     }

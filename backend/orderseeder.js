@@ -47,6 +47,7 @@ const buildOrder = (users, products, index) => {
 
     const orderItems = chosen.map(p => ({
         name: p.name,
+        shade: p.shades?.length ? pick(p.shades) : '',
         quantity: rand(1, 3),
         image: (p.images && p.images[0] && p.images[0].url) || 'no-image',
         price: p.price,

@@ -28,6 +28,10 @@ const ProcessOrder = () => {
     const currentStatus = orderStatus === 'Preparing' ? 'Processing' : orderStatus
     const currentStatusIndex = STATUS_FLOW.indexOf(currentStatus)
     const terminalStatus = currentStatus === 'Delivered' || currentStatus === 'Cancelled'
+    const isStatusUnavailable = (nextStatus) => {
+        const normalizedStatus = nextStatus === 'Preparing' ? 'Processing' : nextStatus
+        return terminalStatus || STATUS_FLOW.indexOf(normalizedStatus) <= currentStatusIndex
+    }
 
     const errMsg = (message = '') => toast.error(message, { position: 'bottom-center' })
     const successMsg = (message = '') => toast.success(message, { position: 'bottom-center' })
@@ -95,13 +99,20 @@ const ProcessOrder = () => {
                                                 alt={item.name}
                                                 sx={{ width: 64, height: 56, objectFit: 'cover', borderRadius: 2, bgcolor: '#eef3f0' }}
                                             />
-                                            <Typography
-                                                component={Link}
-                                                to={`/product/${item.product}`}
-                                                sx={{ flex: 1, color: GREEN, fontWeight: 600, textDecoration: 'none', '&:hover': { color: GOLD } }}
-                                            >
-                                                {item.name}
-                                            </Typography>
+                                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                <Typography
+                                                    component={Link}
+                                                    to={`/product/${item.product}`}
+                                                    sx={{ color: GREEN, fontWeight: 600, textDecoration: 'none', '&:hover': { color: GOLD } }}
+                                                >
+                                                    {item.name}
+                                                </Typography>
+                                                {item.shade && (
+                                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                                                        Variant: {item.shade}
+                                                    </Typography>
+                                                )}
+                                            </Box>
                                             <Typography variant="body2" color="text.secondary">{item.quantity} pc(s)</Typography>
                                             <Typography fontWeight={700} sx={{ color: GREEN, minWidth: 90, textAlign: 'right' }}>
                                                 {peso(item.price)}
@@ -124,18 +135,17 @@ const ProcessOrder = () => {
                                     value={status}
                                     onChange={(e) => setStatus(e.target.value)}
                                     fullWidth
-                                    disabled={terminalStatus}
                                     sx={fieldSx}
                                 >
                                     <MenuItem value="" disabled>Select status</MenuItem>
-                                    <MenuItem value="Pending" disabled>Pending</MenuItem>
+                                    <MenuItem value="Pending" disabled={isStatusUnavailable('Pending')}>Pending</MenuItem>
                                     {/* Keep the legacy API value while showing the user-friendly label. */}
-                                    <MenuItem value="Preparing" disabled={currentStatusIndex !== 0}>Processing</MenuItem>
-                                    <MenuItem value="Shipped" disabled={currentStatusIndex >= 2}>Shipped</MenuItem>
-                                    <MenuItem value="Delivered" disabled={currentStatusIndex >= 3}>Delivered</MenuItem>
+                                    <MenuItem value="Preparing" disabled={isStatusUnavailable('Processing')}>Processing</MenuItem>
+                                    <MenuItem value="Shipped" disabled={isStatusUnavailable('Shipped')}>Shipped</MenuItem>
+                                    <MenuItem value="Delivered" disabled={isStatusUnavailable('Delivered')}>Delivered</MenuItem>
                                 </TextField>
 
-                                <Button fullWidth disableElevation disabled={!status || updating} sx={primaryBtnSx} onClick={() => updateOrderHandler(order._id)}>
+                                <Button fullWidth disableElevation disabled={!status || updating || terminalStatus} sx={primaryBtnSx} onClick={() => updateOrderHandler(order._id)}>
                                     {updating ? <><ActionLoader size={20} color="#fff" />Updating…</> : 'Update Status'}
                                 </Button>
                             </Paper>

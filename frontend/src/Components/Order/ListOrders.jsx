@@ -32,10 +32,10 @@ const statusTone = (status = '') => {
 const orderStages = [
     { value: 'All', label: 'All orders', Icon: AllInboxOutlinedIcon },
     { value: 'Pending', label: 'To be processed', Icon: PendingActionsOutlinedIcon },
-    { value: 'Processing', label: 'Being processed', Icon: AutorenewOutlinedIcon },
+    { value: 'Processing', label: 'Processing', Icon: AutorenewOutlinedIcon },
     { value: 'Shipped', label: 'Shipped', Icon: LocalShippingOutlinedIcon },
     { value: 'Delivered', label: 'Delivered', Icon: TaskAltOutlinedIcon },
-    { value: 'ToRate', label: 'To rate', Icon: RateReviewOutlinedIcon },
+    { value: 'ToRate', label: 'Ratings', Icon: RateReviewOutlinedIcon },
     { value: 'Cancelled', label: 'Cancelled', Icon: HighlightOffOutlinedIcon },
 ]
 
@@ -225,7 +225,7 @@ const ListOrders = () => {
                                                 <Typography variant="caption" color="text.secondary" display="block">Total</Typography>
                                                 <Typography fontWeight={700}>₱{Number(order.totalPrice || 0).toLocaleString()}</Typography>
                                             </Box>
-                                            <Chip label={normalizedStatus(status)} color={statusColor} size="small" sx={{ width: 100, justifySelf: 'center' }} />
+                                            <Chip label={normalizedStatus(status)} color={statusColor} size="small" sx={{ width: 100, justifySelf: 'center', borderRadius: 1 }} />
                                             <Button
                                                 component={Link}
                                                 to={activeStage === 'ToRate' && items[0]?.product

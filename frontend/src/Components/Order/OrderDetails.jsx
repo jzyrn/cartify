@@ -81,7 +81,7 @@ const OrderDetails = () => {
                                             </Typography>
                                             {item.shade && (
                                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                                                    Shade / variant: {item.shade}
+                                                    Variant: {item.shade}
                                                 </Typography>
                                             )}
                                         </Box>
