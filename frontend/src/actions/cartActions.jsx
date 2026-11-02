@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ADD_TO_CART, REMOVE_ITEM_CART, SAVE_SHIPPING_INFO, CLEAR_CART } from '../constants/cartConstants'
+import { ADD_TO_CART, REMOVE_ITEM_CART, REMOVE_ITEMS_CART, SAVE_SHIPPING_INFO, CLEAR_CART } from '../constants/cartConstants'
 
 // Same structure as the professor's file. Differences kept for Cart.jsx:
 //  - shade (default '') so one product can sit in the cart in several shades
@@ -34,6 +34,14 @@ export const removeItemFromCart = (id, shade = '') => async (dispatch, getState)
     dispatch({
         type: REMOVE_ITEM_CART,
         payload: { product: id, shade }
+    })
+    localStorage.setItem('cartItems', JSON.stringify(getState().cart.cartItems))
+}
+
+export const removeItemsFromCart = (items) => async (dispatch, getState) => {
+    dispatch({
+        type: REMOVE_ITEMS_CART,
+        payload: items.map(({ product, shade }) => ({ product, shade: shade || '' })),
     })
     localStorage.setItem('cartItems', JSON.stringify(getState().cart.cartItems))
 }

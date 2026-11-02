@@ -1,10 +1,12 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import Swal from "sweetalert2";
 import {
   Box,
   Button,
   Card,
+  Checkbox,
   Container,
   Divider,
   IconButton,
@@ -15,7 +17,7 @@ import {
 } from "@mui/material";
 import MetaData from "../Layout/MetaData";
 import { ActionLoader } from "../Layout/Loader";
-import { addItemToCart, removeItemFromCart } from "../../actions/cartActions";
+import { addItemToCart, removeItemFromCart, removeItemsFromCart } from "../../actions/cartActions";
 
 const GREEN = "#17332a";
 const GREEN_DARK = "#0f241d";
@@ -26,6 +28,7 @@ const peso = (value) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+const lineKey = (item) => `${item.product}-${item.shade || ""}`;
 
 const Cart = () => {
   const dispatch = useDispatch();
@@ -33,6 +36,37 @@ const Cart = () => {
   const { cartItems } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const [pendingItem, setPendingItem] = React.useState(null);
+  const [selectedLines, setSelectedLines] = React.useState([]);
+
+  const allSelected = cartItems.length > 0 && selectedLines.length === cartItems.length;
+
+  React.useEffect(() => {
+    setSelectedLines((current) => current.filter((key) => cartItems.some((item) => lineKey(item) === key)));
+  }, [cartItems]);
+
+  const toggleLine = (item) => {
+    const key = lineKey(item);
+    setSelectedLines((current) => current.includes(key)
+      ? current.filter((selected) => selected !== key)
+      : [...current, key]);
+  };
+
+  const bulkRemoveHandler = async () => {
+    const itemsToRemove = cartItems.filter((item) => selectedLines.includes(lineKey(item)));
+    if (!itemsToRemove.length) return;
+    const confirmation = await Swal.fire({
+      title: "Remove selected items?",
+      text: `Remove ${itemsToRemove.length} item${itemsToRemove.length === 1 ? "" : "s"} from your cart?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Remove",
+      cancelButtonText: "Keep items",
+      confirmButtonColor: "#b42318",
+    });
+    if (!confirmation.isConfirmed) return;
+    await dispatch(removeItemsFromCart(itemsToRemove));
+    setSelectedLines([]);
+  };
 
   const increaseQty = async (item) => {
     if (pendingItem) return;
@@ -114,6 +148,25 @@ const Cart = () => {
             >
               {/* Item list */}
               <Stack spacing={2}>
+                <Paper variant="outlined" sx={{ borderRadius: 2, px: 1.5, py: 0.75 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={selectedLines.length > 0 && !allSelected}
+                        onChange={(event) => setSelectedLines(event.target.checked ? cartItems.map(lineKey) : [])}
+                        inputProps={{ "aria-label": "Select all cart items" }}
+                        sx={{ color: GREEN, "&.Mui-checked, &.MuiCheckbox-indeterminate": { color: GREEN } }}
+                      />
+                      <Typography variant="body2">Select all</Typography>
+                    </Box>
+                    {selectedLines.length > 0 && (
+                      <Button color="error" onClick={bulkRemoveHandler} sx={{ textTransform: "none", fontWeight: 700 }}>
+                        Remove selected ({selectedLines.length})
+                      </Button>
+                    )}
+                  </Stack>
+                </Paper>
                 {cartItems.map((item) => (
                   <Card
                     variant="outlined"
@@ -146,6 +199,7 @@ const Cart = () => {
                         alignItems: "center",
                         justifyContent: "center",
                         overflow: "hidden",
+                        position: "relative",
                       }}
                     >
                       {item.image ? (
@@ -158,6 +212,20 @@ const Cart = () => {
                       ) : (
                         <Typography variant="caption" color="text.disabled">No image</Typography>
                       )}
+                      <Checkbox
+                        checked={selectedLines.includes(lineKey(item))}
+                        onChange={() => toggleLine(item)}
+                        inputProps={{ "aria-label": `Select ${item.name}${item.shade ? `, ${item.shade} shade` : ""}` }}
+                        sx={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          bgcolor: "rgba(255,255,255,.92)",
+                          borderRadius: 1,
+                          color: GREEN,
+                          "&.Mui-checked": { color: GREEN },
+                        }}
+                      />
                     </Box>
 
                     <Box sx={{ gridArea: "info", minWidth: 0 }}>
