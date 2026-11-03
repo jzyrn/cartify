@@ -28,7 +28,7 @@ import { ActionLoader } from '../Layout/Loader'
 import CheckoutSteps from './CheckoutSteps'
 import { createOrder } from '../../actions/orderActions'
 import { clearCart } from '../../actions/cartActions'
-import { GREEN, GREEN_DARK, GOLD, peso, calcTotals, PLACEHOLDER_IMAGE } from './checkoutUtils'
+import { GREEN, GREEN_DARK, GOLD, peso, calcTotals, PLACEHOLDER_IMAGE } from './CheckoutUtils'
 
 const Payment = () => {
     const dispatch = useDispatch()

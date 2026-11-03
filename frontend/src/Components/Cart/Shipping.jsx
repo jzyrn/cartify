@@ -6,7 +6,7 @@ import { Box, Button, Container, Paper, TextField, Typography } from '@mui/mater
 import MetaData from '../Layout/MetaData'
 import CheckoutSteps from './CheckoutSteps'
 import { saveShippingInfo } from '../../actions/cartActions'
-import { GREEN, GREEN_DARK, GOLD } from './checkoutUtils'
+import { GREEN, GREEN_DARK, GOLD } from './CheckoutUtils'
 
 // keeps the inputs in the site's green instead of the default blue
 const fieldSx = {

@@ -5,7 +5,7 @@ import { Box, Button, Container, Divider, Paper, Typography } from '@mui/materia
 
 import MetaData from '../Layout/MetaData'
 import CheckoutSteps from './CheckoutSteps'
-import { GREEN, GREEN_DARK, GOLD, peso, calcTotals } from './checkoutUtils'
+import { GREEN, GREEN_DARK, GOLD, peso, calcTotals } from './CheckoutUtils'
 
 const Row = ({ label, children }) => (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.5 }}>

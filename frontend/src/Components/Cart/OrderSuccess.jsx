@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { Box, Button, Container, Paper, Typography } from '@mui/material'
 
 import MetaData from '../Layout/MetaData'
-import { GREEN, GREEN_DARK, GOLD, peso, formatOrderNumber } from './checkoutUtils'
+import { GREEN, GREEN_DARK, GOLD, peso, formatOrderNumber } from './CheckoutUtils'
 
 const OrderSuccess = () => {
     const location = useLocation()

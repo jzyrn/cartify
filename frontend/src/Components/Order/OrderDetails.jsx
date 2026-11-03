@@ -7,7 +7,7 @@ import { useDispatch, useSelector } from 'react-redux'
 
 import MetaData from '../Layout/MetaData'
 import { PageHeader, PageLoader, InfoRow, StatusPill, cardSx, GREEN, GOLD } from '../Admin/AdminUI'
-import { formatOrderNumber } from '../Cart/checkoutUtils'
+import { formatOrderNumber } from '../Cart/CheckoutUtils'
 import { clearErrors, getOrderDetails } from '../../actions/orderActions'
 
 const peso = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
