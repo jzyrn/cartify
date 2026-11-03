@@ -26,6 +26,9 @@ import Login from './Components/User/Login'
 import Register from './Components/User/Register'
 import Profile from './Components/User/Profile'
 import UpdateProfile from './Components/User/UpdateProfile'
+import ForgotPassword from './Components/User/ForgotPassword'
+import NewPassword from './Components/User/NewPassword'
+import UpdatePassword from './Components/User/UpdatePassword'
 
 // Customer orders
 import ListOrders from './Components/Order/ListOrders'
@@ -74,8 +77,11 @@ function App() {
 
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/password/forgot" element={<ForgotPassword />} />
+          <Route path="/password/reset/:token" element={<NewPassword />} />
           <Route path="/me" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/me/update" element={<ProtectedRoute><UpdateProfile /></ProtectedRoute>} />
+          <Route path="/password/update" element={<ProtectedRoute><UpdatePassword /></ProtectedRoute>} />
 
           {/* Customer orders */}
           <Route path="/orders/me" element={<ProtectedRoute><ListOrders /></ProtectedRoute>} />
@@ -93,7 +99,7 @@ function App() {
           <Route path="/admin/reviews" element={<ProtectedRoute isAdmin={true}><ProductReviews /></ProtectedRoute>} />
         </Routes>
         <Footer />
-        <ToastContainer />
+        <ToastContainer position="bottom-right" />
       </Router>
     </>
   )

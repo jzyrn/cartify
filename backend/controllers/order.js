@@ -1,6 +1,5 @@
 const Order = require('../models/order')
 const Product = require('../models/product')
-const path = require('path')
 const sendEmail = require('../utils/sendEmail')
 const createOrderReceipt = require('../utils/orderReceipt')
 
@@ -9,6 +8,7 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character =>
 }[character]))
 
 const peso = value => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const emailHtml = html => html.replace(/<img src="cid:cartify-logo"[^>]*>/g, '<span style="color:#fff;font-size:24px;font-weight:bold;letter-spacing:1px">Cartify</span>')
 const customerStatus = status => status === 'Processing' || status === 'Preparing' ? 'Being processed' : status
 const deliveryHeading = status => ({
     Pending: 'DELIVERY ADDRESS',
@@ -48,13 +48,74 @@ const dateRangeMatch = ({ startDate, endDate } = {}) => {
 const ADMIN_STATUSES = ['Processing', 'Preparing', 'Shipped', 'Delivered']
 const STATUS_FLOW = ['Pending', 'Processing', 'Shipped', 'Delivered']
 
+const groupOrderQuantities = orderItems => {
+    const quantities = new Map()
+    for (const item of orderItems || []) {
+        if (!item || typeof item !== 'object') {
+            throw new Error('Each order item must be valid.')
+        }
+        const quantity = Number(item.quantity)
+        if (!/^[a-f\d]{24}$/i.test(String(item.product || '')) || !Number.isInteger(quantity) || quantity < 1) {
+            throw new Error('Each order item must have a valid product and a quantity of at least 1.')
+        }
+        const productId = String(item.product)
+        quantities.set(productId, (quantities.get(productId) || 0) + quantity)
+    }
+    return quantities
+}
+
+const deductOrderStock = async (quantities) => {
+    const adjusted = []
+    try {
+        for (const [productId, quantity] of quantities) {
+            const product = await Product.findOneAndUpdate(
+                { _id: productId, stock: { $gte: quantity } },
+                { $inc: { stock: -quantity } },
+                { new: true }
+            )
+            if (!product) {
+                const current = await Product.findById(productId).select('name stock')
+                if (!current) throw new Error('An item in this order is no longer available.')
+                throw new Error(`Only ${current.stock} unit(s) of ${current.name} are currently available.`)
+            }
+            adjusted.push({ productId, quantity })
+        }
+        return adjusted
+    } catch (error) {
+        await Promise.all(adjusted.map(({ productId, quantity }) =>
+            Product.updateOne({ _id: productId }, { $inc: { stock: quantity } })
+        ))
+        throw error
+    }
+}
+
+const restoreOrderStock = async adjusted => Promise.all((adjusted || []).map(({ productId, quantity }) =>
+    Product.updateOne({ _id: productId }, { $inc: { stock: quantity } })
+))
+
 // POST /order/new
 exports.newOrder = async (req, res) => {
     try {
         const { orderItems, shippingInfo, itemsPrice, taxPrice, shippingPrice, totalPrice, paymentInfo } = req.body
 
-        if (!orderItems || orderItems.length === 0) {
+        if (!Array.isArray(orderItems) || orderItems.length === 0) {
             return fail(res, 'No order items', 400)
+        }
+
+        let requestedQuantities
+        try {
+            requestedQuantities = groupOrderQuantities(orderItems)
+        } catch (error) {
+            return fail(res, error.message, 400)
+        }
+        const products = await Product.find({ _id: { $in: [...requestedQuantities.keys()] } }).select('name stock')
+        const productsById = new Map(products.map(product => [String(product._id), product]))
+        for (const [productId, quantity] of requestedQuantities) {
+            const product = productsById.get(productId)
+            if (!product) return fail(res, 'An item in your cart is no longer available.', 400)
+            if (quantity > product.stock) {
+                return fail(res, `Only ${product.stock} unit(s) of ${product.name} are currently available.`, 400)
+            }
         }
 
         // orderStatus is not taken from the body, the model default ('Pending') is used
@@ -70,7 +131,41 @@ exports.newOrder = async (req, res) => {
             user: req.user._id
         })
 
-        res.status(200).json({ success: true, order })
+        await order.populate('user', 'name email')
+
+        let emailSent = false
+        let emailError
+        if (order.user?.email) {
+            const customerName = escapeHtml(order.user.name || 'Customer')
+            const orderNumber = escapeHtml(order._id)
+            const rows = (order.orderItems || []).map(item => `
+                <tr><td style="padding:12px;border-bottom:1px solid #e3e9e5">${escapeHtml(item.name)}<br><span style="color:#6b7a73;font-size:12px">${escapeHtml(item.shade || 'Standard')} · Qty ${Number(item.quantity || 0)}</span></td>
+                <td style="padding:12px;border-bottom:1px solid #e3e9e5;text-align:right">${peso(Number(item.price || 0) * Number(item.quantity || 0))}</td></tr>`).join('')
+            const ship = order.shippingInfo || {}
+            const address = [ship.address, ship.city, ship.postalCode, ship.country].filter(Boolean).map(escapeHtml).join(', ')
+            const paymentStatus = order.paymentInfo?.status === 'succeeded' || order.paymentInfo?.id?.startsWith('CARD-') ? 'Paid' : 'Pay on delivery'
+            const html = `<div style="background:#f2f6f3;padding:28px 12px;font-family:Arial,Helvetica,sans-serif;color:#263a31"><table style="width:100%;max-width:640px;margin:auto;background:#fff;border:1px solid #e3e9e5;border-collapse:collapse"><tr><td style="padding:22px 28px;background:#17332a;border-bottom:4px solid #c9a227"><img src="cid:cartify-logo" width="142" alt="Cartify" style="display:block"></td></tr><tr><td style="padding:28px"><div style="color:#8c7418;font-size:12px;font-weight:bold;letter-spacing:1px">ORDER CONFIRMATION</div><h1 style="color:#17332a;font-size:24px">Thanks for your order, ${customerName}!</h1><p>Your order is confirmed and is now <strong>Pending</strong>. We’ll email you as its status changes.</p><p><strong>Order #${orderNumber}</strong><br>${new Date(order.createdAt || Date.now()).toLocaleDateString('en-PH')}</p><table style="width:100%;border-collapse:collapse">${rows}</table><p>Subtotal: ${peso(order.itemsPrice)}<br>Shipping: ${peso(order.shippingPrice)}<br>Tax: ${peso(order.taxPrice)}<br><strong style="font-size:17px">Total: ${peso(order.totalPrice)}</strong></p><p><strong>Delivering to</strong><br>${customerName}<br>${address}<br>${escapeHtml(ship.phoneNo || '')}</p><p><strong>Payment:</strong> ${paymentStatus}</p></td></tr><tr><td style="padding:20px;background:#17332a;color:white;text-align:center">Your itemized PDF receipt is attached.<br>Thanks for shopping with Cartify!</td></tr></table></div>`
+            const text = `Thanks for your order, ${order.user.name || 'Customer'}!\n\nOrder #${order._id}\nStatus: Pending\nTotal: ${peso(order.totalPrice)}\nPayment: ${paymentStatus}\nDelivering to: ${[ship.address, ship.city, ship.postalCode, ship.country].filter(Boolean).join(', ')}\n\nYour itemized PDF receipt is attached.`
+            try {
+                await sendEmail({
+                    email: order.user.email,
+                    subject: `Your Cartify order #${order._id} is confirmed`,
+                    text,
+                    html: emailHtml(html),
+                    attachments: [
+                        { filename: `Cartify-Receipt-${order._id}.pdf`, content: createOrderReceipt(order, order.user), contentType: 'application/pdf' },
+                    ],
+                })
+                emailSent = true
+            } catch (error) {
+                emailError = error.message
+                console.error(`Order confirmation email failed for ${order._id}: ${error.message}`)
+            }
+        } else {
+            emailError = 'Customer email address is unavailable.'
+        }
+
+        res.status(200).json({ success: true, order, emailSent, emailError })
     } catch (error) {
         fail(res, error)
     }
@@ -122,8 +217,7 @@ exports.cancelOrder = async (req, res) => {
         if (order.orderStatus !== 'Pending') {
             return fail(res, 'This order can no longer be cancelled', 400)
         }
-
-        // stock is only reduced on delivery, so there is nothing to put back here
+        // Pending orders do not reserve inventory, so there is nothing to put back here.
         order.orderStatus = 'Cancelled'
         await order.save()
 
@@ -154,7 +248,7 @@ exports.allOrders = async (req, res) => {
 // PUT /admin/order/:id   body: { status }
 exports.updateOrder = async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id).populate('user', 'name email')
+        let order = await Order.findById(req.params.id).populate('user', 'name email')
 
         if (!order) {
             return fail(res, 'No order found with this ID', 404)
@@ -167,7 +261,6 @@ exports.updateOrder = async (req, res) => {
         if (order.orderStatus === 'Cancelled') {
             return fail(res, 'This order was cancelled by the customer', 400)
         }
-
         const { status } = req.body
         if (!ADMIN_STATUSES.includes(status)) {
             return fail(res, 'Please choose a valid status', 400)
@@ -179,23 +272,37 @@ exports.updateOrder = async (req, res) => {
         const currentStatusIndex = STATUS_FLOW.indexOf(currentStatus)
         const nextStatusIndex = STATUS_FLOW.indexOf(nextStatus)
         if (currentStatusIndex < 0 || nextStatusIndex <= currentStatusIndex) {
-            return fail(res, 'Order status cannot move backward or remain unchanged', 400)
+            return fail(res, 'Order status must move forward.', 400)
         }
 
-        // stock goes down once, when the order is delivered
-        if (status === 'Delivered') {
-            for (const item of order.orderItems) {
-                const product = await Product.findById(item.product)
-                if (product) {
-                    product.stock = Math.max(0, product.stock - item.quantity)
-                    await product.save({ validateBeforeSave: false })
+        const processingIndex = STATUS_FLOW.indexOf('Processing')
+        const shouldDeductStock = !order.stockDeducted &&
+            currentStatusIndex < nextStatusIndex && nextStatusIndex >= processingIndex
+        if (shouldDeductStock) {
+            let adjustedStock = []
+            try {
+                adjustedStock = await deductOrderStock(groupOrderQuantities(order.orderItems))
+                const updateFields = { orderStatus: nextStatus, stockDeducted: true }
+                if (nextStatus === 'Delivered') updateFields.deliveredAt = Date.now()
+                const processedOrder = await Order.findOneAndUpdate(
+                    { _id: order._id, orderStatus: order.orderStatus, stockDeducted: { $ne: true } },
+                    { $set: updateFields },
+                    { new: true }
+                ).populate('user', 'name email')
+                if (!processedOrder) {
+                    await restoreOrderStock(adjustedStock)
+                    return fail(res, 'This order has already changed. Refresh and try again.', 409)
                 }
+                order = processedOrder
+            } catch (error) {
+                await restoreOrderStock(adjustedStock)
+                return fail(res, error.message, 409)
             }
-            order.deliveredAt = Date.now()
+        } else {
+            order.orderStatus = nextStatus
+            if (nextStatus === 'Delivered') order.deliveredAt = Date.now()
+            await order.save()
         }
-
-        order.orderStatus = nextStatus
-        await order.save()
 
         let emailSent = false
         let emailError
@@ -221,7 +328,6 @@ exports.updateOrder = async (req, res) => {
             const address = [ship.address, ship.city, ship.postalCode, ship.country].filter(Boolean).map(escapeHtml).join(', ')
             const paymentStatus = order.paymentInfo?.status === 'succeeded' || order.paymentInfo?.id?.startsWith('CARD-') ? 'Paid' : 'Pay on delivery'
             const paymentReference = escapeHtml(order.paymentInfo?.id || 'COD')
-            const logoPath = path.join(__dirname, '../../frontend/src/assets/cartify_logo.png')
             const html = `<div style="margin:0;padding:28px 12px;background:#f2f6f3;font-family:Arial,Helvetica,sans-serif;color:#263a31">
               <table role="presentation" style="width:100%;max-width:720px;margin:0 auto;border-collapse:collapse;background:#ffffff;border:1px solid #e3e9e5;border-radius:12px;overflow:hidden">
                 <tr><td style="padding:22px 30px;background:#17332a;border-bottom:4px solid #c9a227">
@@ -274,18 +380,12 @@ exports.updateOrder = async (req, res) => {
                     email: order.user.email,
                     subject: `Cartify order #${order._id} is ${nextStatus}`,
                     text,
-                    html,
+                    html: emailHtml(html),
                     attachments: [
                         {
                             filename: `Cartify-Receipt-${order._id}.pdf`,
                             content: createOrderReceipt(order, order.user),
                             contentType: 'application/pdf',
-                        },
-                        {
-                            filename: 'cartify-logo.png',
-                            path: logoPath,
-                            cid: 'cartify-logo',
-                            contentDisposition: 'inline',
                         },
                     ],
                 })

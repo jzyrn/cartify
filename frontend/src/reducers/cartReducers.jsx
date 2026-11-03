@@ -1,5 +1,5 @@
 /* eslint-disable no-case-declarations */
-import { ADD_TO_CART, REMOVE_ITEM_CART, REMOVE_ITEMS_CART, SAVE_SHIPPING_INFO, CLEAR_CART } from '../constants/cartConstants'
+import { ADD_TO_CART, REMOVE_ITEM_CART, REMOVE_ITEMS_CART, SAVE_SHIPPING_INFO, CLEAR_CART, RESTORE_USER_CART } from '../constants/cartConstants'
 
 // The professor's reducer matches cart lines by product only.
 // Cart.jsx lets the same product be added in different shades, so a line is product + shade.
@@ -7,6 +7,12 @@ const sameLine = (a, b) => a.product === b.product && (a.shade || '') === (b.sha
 
 export const cartReducer = (state = { cartItems: [], shippingInfo: {} }, action) => {
     switch (action.type) {
+        case RESTORE_USER_CART:
+            return {
+                ...state,
+                cartItems: action.payload?.cartItems || [],
+                shippingInfo: action.payload?.shippingInfo || {},
+            }
         case ADD_TO_CART:
             const item = action.payload
 

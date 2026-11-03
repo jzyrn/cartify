@@ -206,14 +206,21 @@ exports.forgotPassword = async (req, res) => {
     const resetToken = user.getResetPasswordToken()
     await user.save({ validateBeforeSave: false })
 
-    const frontend = process.env.FRONTEND_URL || 'http://localhost:5173'
+    const frontend = (process.env.FRONTEND_URL || req.get('origin') || 'http://localhost:5173').replace(/\/+$/, '')
     const resetUrl = `${frontend}/password/reset/${resetToken}`
     const message = `Your password reset link is:\n\n${resetUrl}\n\nIt expires in 30 minutes. If you did not request this, ignore this email.`
+    const safeResetUrl = resetUrl.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]))
 
     try {
-        await sendEmail({ email: user.email, subject: 'Cartify Password Recovery', message })
+        await sendEmail({
+            email: user.email,
+            subject: 'Cartify Password Recovery',
+            message,
+            html: `<!doctype html><html><body style="margin:0;padding:0;background:#f6f5f0;font-family:Arial,Helvetica,sans-serif;color:#17332a"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f5f0;padding:32px 12px"><tr><td align="center"><table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid #e3e9e5"><tr><td style="padding:24px 32px;background:#17332a;border-bottom:4px solid #c9a227;color:#ffffff;font-size:24px;font-weight:bold;letter-spacing:2px">CARTIFY</td></tr><tr><td style="padding:32px"><p style="margin:0 0 12px;color:#c9a227;font-size:12px;font-weight:bold;letter-spacing:2px">ACCOUNT SECURITY</p><h1 style="margin:0 0 16px;color:#17332a;font-size:24px">Reset your password</h1><p style="margin:0 0 24px;color:#53645c;font-size:15px;line-height:1.6">We received a request to reset your Cartify password. Use the button below to choose a new one.</p><table role="presentation" cellspacing="0" cellpadding="0"><tr><td style="background:#17332a;border-radius:4px"><a href="${safeResetUrl}" style="display:inline-block;padding:14px 24px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;letter-spacing:1px">RESET PASSWORD</a></td></tr></table><p style="margin:24px 0 8px;color:#53645c;font-size:13px;line-height:1.6">This link expires in 30 minutes. If you did not request a password reset, you can safely ignore this email.</p><p style="margin:20px 0 0;color:#829088;font-size:12px;line-height:1.5">If the button doesn’t work, copy this link into your browser:<br><a href="${safeResetUrl}" style="color:#2b5344;word-break:break-all">${safeResetUrl}</a></p></td></tr><tr><td style="padding:16px 32px;background:#f1f5f2;color:#718078;font-size:12px">Cartify · Makeup you’ll actually love wearing.</td></tr></table></td></tr></table></body></html>`
+        })
         res.status(200).json(reply)
     } catch (err) {
+        console.error('Password reset email delivery failed:', err.message)
         user.resetPasswordToken = undefined
         user.resetPasswordExpire = undefined
         await user.save({ validateBeforeSave: false })

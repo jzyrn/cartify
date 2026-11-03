@@ -102,7 +102,7 @@ export default function ProductDetails() {
       const added = await dispatch(addItemToCart(product._id, quantity, shade));
       if (added) toast.success("Cart updated", { position: "bottom-right" });
     } catch (requestError) {
-      toast.error(requestError.response?.data?.message || "Could not update your cart.", { position: "bottom-right" });
+      toast.error(requestError.response?.data?.message || requestError.message || "Could not update your cart.", { position: "bottom-right" });
     } finally {
       setAddingToCart(false);
     }

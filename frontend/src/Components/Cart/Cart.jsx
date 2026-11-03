@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Swal from "sweetalert2";
+import { toast } from "react-toastify";
 import {
   Box,
   Button,
@@ -73,7 +74,11 @@ const Cart = () => {
     const newQty = item.quantity + 1;
     if (newQty > item.stock) return;
     setPendingItem(item.product);
-    try { await dispatch(addItemToCart(item.product, newQty, item.shade)); } finally { setPendingItem(null); }
+    try {
+      await dispatch(addItemToCart(item.product, newQty, item.shade));
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || "Could not update quantity.", { position: "bottom-right" });
+    } finally { setPendingItem(null); }
   };
 
   const decreaseQty = async (item) => {
@@ -81,7 +86,11 @@ const Cart = () => {
     const newQty = item.quantity - 1;
     if (newQty <= 0) return;
     setPendingItem(item.product);
-    try { await dispatch(addItemToCart(item.product, newQty, item.shade)); } finally { setPendingItem(null); }
+    try {
+      await dispatch(addItemToCart(item.product, newQty, item.shade, true));
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || "Could not update quantity.", { position: "bottom-right" });
+    } finally { setPendingItem(null); }
   };
 
   const removeHandler = async (item) => {

@@ -362,21 +362,37 @@
   padding: 70px 0;
 }
 
+.shop-products-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  align-items: start;
+  gap: 32px;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
 .shop-filter-sidebar {
-  position: static;
   width: 100%;
-  max-width: 320px;
-  margin-bottom: 24px;
+  max-width: none;
+  margin: 0;
   padding: 0 8px;
 }
 
-@media (min-width: 1800px) {
+.shop-products-main {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .shop-products-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 0 18px;
+  }
+
   .shop-filter-sidebar {
-    position: absolute;
-    top: 0;
-    left: 8px;
-    width: 240px;
-    margin-bottom: 0;
+    max-width: 420px;
+    padding: 0;
   }
 }
 
@@ -409,9 +425,27 @@
   flex-direction: column;
 }
 
+.shop-card-skeleton {
+  overflow: hidden;
+}
+
+.shop-card-skeleton-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  transform: none !important;
+}
+
+.shop-card-skeleton-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
 .shop-card-image {
-  background: var(--green-900);
-  aspect-ratio: 4 / 3;
+  background: #f7f5f0;
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -420,10 +454,6 @@
 
 .shop-card-image img {
   transition: transform 240ms ease;
-}
-
-.shop-card:hover .shop-card-image img {
-  transform: scale(1.05);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -761,10 +791,10 @@
 /* product details */
 .cartify-details-back { color: #2c5545; text-decoration: none; }
 .cartify-details-image {
-  aspect-ratio: 1 / 1; background: #1a3a2f; border-radius: 16px; overflow: hidden;
+  aspect-ratio: 1 / 1; background: #f7f5f0; border-radius: 16px; overflow: hidden;
   display: flex; align-items: center; justify-content: center; color: #c9a227; font-size: 4rem;
 }
-.cartify-details-image img { width: 100%; height: 100%; object-fit: cover; }
+.cartify-details-image img { width: 100%; height: 100%; object-fit: contain; }
 .cartify-details-meta { margin: 0; text-transform: uppercase; font-size: 0.8rem; color: #6b7d75; letter-spacing: 0.05em; }
 .cartify-details-name { margin: 0.25rem 0; color: #1a3a2f; font-weight: 700; }
 .cartify-details-brand { margin: 0; color: #c9a227; font-weight: 600; }

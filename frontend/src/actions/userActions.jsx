@@ -34,6 +34,7 @@ import {
     DELETE_USER_FAIL,
     CLEAR_ERRORS
 } from '../constants/userConstants'
+import { restoreUserCart, saveUserCartAndClearActive } from './cartActions'
 
 export const register = (userData) => async (dispatch) => {
     try {
@@ -50,6 +51,7 @@ export const register = (userData) => async (dispatch) => {
             type: REGISTER_USER_SUCCESS,
             payload: data.user
         })
+        dispatch(restoreUserCart(data.user))
     } catch (error) {
         dispatch({
             type: REGISTER_USER_FAIL,
@@ -73,6 +75,7 @@ export const login = (email, password) => async (dispatch) => {
             type: LOGIN_SUCCESS,
             payload: data.user
         })
+        dispatch(restoreUserCart(data.user))
     } catch (error) {
         dispatch({
             type: LOGIN_FAIL,
@@ -91,6 +94,7 @@ export const logout = () => async (dispatch) => {
         }
         await axios.get(`${import.meta.env.VITE_API}/logout`, config)
 
+        dispatch(saveUserCartAndClearActive())
         dispatch({ type: LOGOUT_SUCCESS })
     } catch (error) {
         dispatch({
@@ -157,12 +161,14 @@ export const loadUser = () => async (dispatch) => {
             type: LOAD_USER_SUCCESS,
             payload: data.user
         })
+        dispatch(restoreUserCart(data.user))
     } catch (error) {
         // being logged out on first load is not an error to show
         dispatch({
             type: LOAD_USER_FAIL,
             payload: null
         })
+        dispatch(saveUserCartAndClearActive())
     }
 }
 

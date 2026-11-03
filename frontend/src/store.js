@@ -28,12 +28,9 @@ import {
 
 const initialState = {
     cart: {
-        cartItems: localStorage.getItem('cartItems')
-            ? JSON.parse(localStorage.getItem('cartItems'))
-            : [],
-        shippingInfo: localStorage.getItem('shippingInfo')
-            ? JSON.parse(localStorage.getItem('shippingInfo'))
-            : {},
+        // Cart state is restored only after the server identifies the signed-in user.
+        cartItems: [],
+        shippingInfo: {},
     },
     auth: {},
     user: {},

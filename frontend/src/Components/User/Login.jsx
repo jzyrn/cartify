@@ -7,6 +7,9 @@ import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
 import InputAdornment from '@mui/material/InputAdornment'
+import IconButton from '@mui/material/IconButton'
+import Visibility from '@mui/icons-material/Visibility'
+import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import { useDispatch, useSelector } from 'react-redux'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -210,13 +213,16 @@ const Login = () => {
                                             input: {
                                                 endAdornment: (
                                                     <InputAdornment position="end">
-                                                        <Button
+                                                        <IconButton
                                                             size="small"
+                                                            edge="end"
+                                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                                            title={showPassword ? 'Hide password' : 'Show password'}
                                                             onClick={() => setShowPassword((show) => !show)}
-                                                            sx={{ color: GREEN, minWidth: 0 }}
+                                                            sx={{ color: GREEN }}
                                                         >
-                                                            {showPassword ? 'Hide' : 'Show'}
-                                                        </Button>
+                                                            {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                                        </IconButton>
                                                     </InputAdornment>
                                                 ),
                                             },

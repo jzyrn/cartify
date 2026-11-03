@@ -33,8 +33,8 @@ const ProcessOrder = () => {
         return terminalStatus || STATUS_FLOW.indexOf(normalizedStatus) <= currentStatusIndex
     }
 
-    const errMsg = (message = '') => toast.error(message, { position: 'bottom-center' })
-    const successMsg = (message = '') => toast.success(message, { position: 'bottom-center' })
+    const errMsg = (message = '') => toast.error(message, { position: 'bottom-right' })
+    const successMsg = (message = '') => toast.success(message, { position: 'bottom-right' })
 
     useEffect(() => {
         dispatch(getOrderDetails(orderId))

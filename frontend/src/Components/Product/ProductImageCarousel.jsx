@@ -13,7 +13,7 @@ const ProductImageCarousel = ({ images = [], alt = 'Product image', compact = fa
     return (
         <Box sx={{ position: 'relative', width: '100%', height: '100%', minHeight: compact ? 52 : 120, overflow: 'hidden', bgcolor: '#faecd9', display: 'grid', placeItems: 'center' }}>
             {sources.length ? (
-                <Box component="img" src={sources[activeIndex]} alt={`${alt}${sources.length > 1 ? `, image ${activeIndex + 1} of ${sources.length}` : ''}`} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', ...imageSx }} />
+                <Box component="img" src={sources[activeIndex]} alt={`${alt}${sources.length > 1 ? `, image ${activeIndex + 1} of ${sources.length}` : ''}`} loading="lazy" decoding="async" sx={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', ...imageSx }} />
             ) : (
                 <Box component="span" sx={{ color: '#1a3329', fontSize: compact ? 18 : 30 }} aria-hidden="true">
                     <i className="fa fa-shopping-bag" />

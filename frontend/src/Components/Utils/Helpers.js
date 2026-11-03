@@ -30,9 +30,9 @@ export const logout = (next) => {
     if (next) next()
 }
 
-export const authConfig = () => ({
-    headers: { Authorization: `Bearer ${getToken()}` }
-})
+// Authenticated API routes use the httpOnly session cookie. Include it on
+// cross-origin requests (Render frontend -> Render backend).
+export const authConfig = () => ({ withCredentials: true })
 
 // toast helpers
 export const errMsg = (message = '') => toast.error(message, { position: 'bottom-right' })

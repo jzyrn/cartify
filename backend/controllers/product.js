@@ -173,8 +173,7 @@ exports.updateProduct = async (req, res, next) => {
             for (const image of newImages) {
                 const result = await cloudinary.v2.uploader.upload(image, {
                     folder: 'products',
-                    width: 150,
-                    crop: 'scale',
+                    resource_type: 'image',
                 });
                 uploadedImageLinks.push({
                     public_id: result.public_id,
