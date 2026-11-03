@@ -16,6 +16,10 @@ import {
     DELETE_PRODUCT_SUCCESS,
     DELETE_PRODUCT_RESET,
     DELETE_PRODUCT_FAIL,
+    BULK_DELETE_PRODUCTS_REQUEST,
+    BULK_DELETE_PRODUCTS_SUCCESS,
+    BULK_DELETE_PRODUCTS_RESET,
+    BULK_DELETE_PRODUCTS_FAIL,
     UPDATE_PRODUCT_REQUEST,
     UPDATE_PRODUCT_SUCCESS,
     UPDATE_PRODUCT_RESET,
@@ -147,6 +151,14 @@ export const productReducer = (state = {}, action) => {
                 ...state,
                 loading: true
             }
+        case BULK_DELETE_PRODUCTS_REQUEST:
+            return { ...state, bulkDeleteLoading: true, bulkDeleteError: null, isBulkDeleted: false }
+        case BULK_DELETE_PRODUCTS_SUCCESS:
+            return { ...state, bulkDeleteLoading: false, isBulkDeleted: true, bulkDeletedCount: action.payload.deletedCount }
+        case BULK_DELETE_PRODUCTS_FAIL:
+            return { ...state, bulkDeleteLoading: false, bulkDeleteError: action.payload }
+        case BULK_DELETE_PRODUCTS_RESET:
+            return { ...state, isBulkDeleted: false, bulkDeletedCount: 0, bulkDeleteError: null }
         case DELETE_PRODUCT_SUCCESS:
             return {
                 ...state,

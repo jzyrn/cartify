@@ -11,17 +11,22 @@ import MetaData from '../Layout/MetaData'
 import { ActionLoader } from '../Layout/Loader'
 import { AdminLayout, PageHeader, PageLoader, IconAction, StatusPill, primaryBtnSx, cardSx, dataGridSx, gridProps, idCellSx } from './AdminUI'
 import { getAdminProducts, deleteProduct, bulkDeleteProducts, clearErrors } from '../../actions/productActions'
-import { DELETE_PRODUCT_RESET } from '../../constants/productConstants'
+import { BULK_DELETE_PRODUCTS_RESET, DELETE_PRODUCT_RESET } from '../../constants/productConstants'
 import ProductImageCarousel from '../Product/ProductImageCarousel'
 
 const ProductsList = () => {
     const dispatch = useDispatch()
     const { loading, error, products } = useSelector(state => state.products)
-    const { error: deleteError, isDeleted, loading: deleting } = useSelector(state => state.product)
+    const {
+        error: deleteError,
+        isDeleted,
+        loading: deleting,
+        bulkDeleteLoading,
+        bulkDeleteError,
+    } = useSelector(state => state.product)
 
     // checkbox selection (DataGrid v8 keeps it as { type, ids })
     const [selection, setSelection] = useState({ type: 'include', ids: new Set() })
-    const [bulkDeleting, setBulkDeleting] = useState(false)
 
     const deleteProductHandler = (id) => {
         dispatch(deleteProduct(id))
@@ -40,11 +45,16 @@ const ProductsList = () => {
             dispatch(clearErrors())
         }
 
+        if (bulkDeleteError) {
+            toast.error(bulkDeleteError, { position: 'bottom-right' })
+            dispatch({ type: BULK_DELETE_PRODUCTS_RESET })
+        }
+
         if (isDeleted) {
             toast.success('Product deleted successfully', { position: 'bottom-right' })
             dispatch({ type: DELETE_PRODUCT_RESET })
         }
-    }, [error, deleteError])
+    }, [error, deleteError, bulkDeleteError])
 
     const rows = products.map(product => ({
         id: product._id,
@@ -62,7 +72,7 @@ const ProductsList = () => {
             : Array.from(selection.ids)
 
     const bulkDeleteHandler = async () => {
-        if (selectedIds.length === 0 || bulkDeleting) return
+        if (selectedIds.length === 0 || bulkDeleteLoading) return
         const confirmation = await Swal.fire({
             title: 'Delete selected products?',
             text: `Delete ${selectedIds.length} selected product${selectedIds.length === 1 ? '' : 's'}? This action cannot be undone.`,
@@ -74,17 +84,14 @@ const ProductsList = () => {
         })
         if (!confirmation.isConfirmed) return
 
-        setBulkDeleting(true)
         try {
             const result = await dispatch(bulkDeleteProducts(selectedIds))
             toast.success(`${result.deletedCount} product${result.deletedCount === 1 ? '' : 's'} deleted successfully`, { position: 'bottom-right' })
             setSelection({ type: 'include', ids: new Set() })
-            dispatch({ type: DELETE_PRODUCT_RESET })
+            dispatch({ type: BULK_DELETE_PRODUCTS_RESET })
             dispatch(getAdminProducts())
-        } catch (deleteError) {
-            toast.error(deleteError.response?.data?.message || 'Could not delete the selected products.', { position: 'bottom-right' })
-        } finally {
-            setBulkDeleting(false)
+        } catch {
+            // The bulk-delete error is stored and displayed through Redux.
         }
     }
 
@@ -129,7 +136,7 @@ const ProductsList = () => {
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <IconAction to={`/admin/product/${params.id}`} icon="fa-pencil" title="Edit" />
-                    <IconAction onClick={() => deleteProductHandler(params.id)} icon="fa-trash" title="Delete" tone="danger" loading={deleting || bulkDeleting} />
+                    <IconAction onClick={() => deleteProductHandler(params.id)} icon="fa-trash" title="Delete" tone="danger" loading={deleting || bulkDeleteLoading} />
                 </Box>
             ),
         },
@@ -147,13 +154,13 @@ const ProductsList = () => {
                             {selectedIds.length > 0 && (
                                 <Button
                                     onClick={bulkDeleteHandler}
-                                    disabled={deleting || bulkDeleting}
+                                    disabled={deleting || bulkDeleteLoading}
                                     variant="contained"
                                     color="error"
                                     disableElevation
                                     sx={{ textTransform: 'none', fontWeight: 700 }}
                                 >
-                                    {deleting || bulkDeleting ? <><ActionLoader size={20} color="#fff" />Deleting…</> : `Delete selected (${selectedIds.length})`}
+                                    {deleting || bulkDeleteLoading ? <><ActionLoader size={20} color="#fff" />Deleting…</> : `Delete selected (${selectedIds.length})`}
                                 </Button>
                             )}
                             <Button component={Link} to="/admin/product" disableElevation sx={primaryBtnSx}>+ New Product</Button>

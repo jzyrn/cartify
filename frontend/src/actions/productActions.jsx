@@ -15,6 +15,9 @@ import {
     DELETE_PRODUCT_REQUEST,
     DELETE_PRODUCT_SUCCESS,
     DELETE_PRODUCT_FAIL,
+    BULK_DELETE_PRODUCTS_REQUEST,
+    BULK_DELETE_PRODUCTS_SUCCESS,
+    BULK_DELETE_PRODUCTS_FAIL,
     UPDATE_PRODUCT_REQUEST,
     UPDATE_PRODUCT_SUCCESS,
     UPDATE_PRODUCT_FAIL,
@@ -152,12 +155,20 @@ export const deleteProduct = (id) => async (dispatch) => {
     }
 }
 
-export const bulkDeleteProducts = (ids) => async () => {
-    const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/products/bulk`, {
-        data: { ids },
-        withCredentials: true,
-    })
-    return data
+export const bulkDeleteProducts = (ids) => async (dispatch) => {
+    dispatch({ type: BULK_DELETE_PRODUCTS_REQUEST })
+    try {
+        const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/products/bulk`, {
+            data: { ids },
+            withCredentials: true,
+        })
+        dispatch({ type: BULK_DELETE_PRODUCTS_SUCCESS, payload: data })
+        return data
+    } catch (error) {
+        const message = error.response?.data?.message || error.message || 'Could not delete the selected products.'
+        dispatch({ type: BULK_DELETE_PRODUCTS_FAIL, payload: message })
+        throw error
+    }
 }
 
 export const newReview = (reviewData) => async (dispatch) => {
