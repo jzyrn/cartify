@@ -1,6 +1,6 @@
 import React from 'react'
 import { Step, StepLabel, Stepper } from '@mui/material'
-import { GREEN } from './checkoutUtils'
+import { GREEN } from './CheckoutUtils'
 
 const STEPS = ['Shipping', 'Confirm order', 'Payment']
 

@@ -17,7 +17,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import MetaData from '../Layout/MetaData'
 import { ActionLoader } from '../Layout/Loader'
 import { PageHeader, PageLoader, primaryBtnSx, cardSx } from '../Admin/AdminUI'
-import { formatOrderNumber } from '../Cart/checkoutUtils'
+import { formatOrderNumber } from '../Cart/CheckoutUtils'
 import { myOrders, clearErrors, cancelCustomerOrder } from '../../actions/orderActions'
 
 const statusTone = (status = '') => {
