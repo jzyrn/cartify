@@ -131,8 +131,12 @@ const buildPageCommands = (order, user, pageIndex, pageCount, logo) => {
 
     rect(0, 755, 612, 87, COLORS.green)
     rect(0, 752, 612, 3, COLORS.gold)
-    const logoWidth = Math.min(134, 48 * logo.width / logo.height)
-    commands.push(`q ${logoWidth} 0 0 48 42 774 cm /Logo Do Q`)
+    if (logo) {
+        const logoWidth = Math.min(134, 48 * logo.width / logo.height)
+        commands.push(`q ${logoWidth} 0 0 48 42 774 cm /Logo Do Q`)
+    } else {
+        text('CARTIFY', 42, 790, 20, COLORS.white, 'F2')
+    }
     text('YOUR ORDER, BEAUTIFULLY WRAPPED', 42, 761, 6, [224, 232, 227])
     text('ORDER RECEIPT', 430, 800, 9, COLORS.white, 'F2')
     text(`#${String(order._id).slice(-10).toUpperCase()}`, 430, 783, 8, [224, 232, 227])
@@ -175,8 +179,10 @@ const buildPageCommands = (order, user, pageIndex, pageCount, logo) => {
 }
 
 const createOrderReceipt = (order, user = order.user) => {
-    const logoPath = path.join(__dirname, '../../frontend/src/assets/cartify_logo.png')
-    const logo = readPng(logoPath)
+    // The backend is deployed separately from the frontend, so its receipt
+    // must not depend on an asset inside the frontend repository.
+    const logoPath = path.join(__dirname, '../assets/cartify_logo.png')
+    const logo = fs.existsSync(logoPath) ? readPng(logoPath) : null
     const items = order.orderItems || []
     const objects = []
     const addObject = value => {
@@ -188,11 +194,14 @@ const createOrderReceipt = (order, user = order.user) => {
     const pagesId = addObject('')
     const regularFontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
     const boldFontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>')
-    let alphaId
-    if (logo.alpha) {
-        alphaId = addObject(streamObject(`/Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode`, logo.alpha))
+    let logoId
+    if (logo) {
+        let alphaId
+        if (logo.alpha) {
+            alphaId = addObject(streamObject(`/Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode`, logo.alpha))
+        }
+        logoId = addObject(streamObject(`/Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode${alphaId ? ` /SMask ${alphaId} 0 R` : ''}`, logo.rgb))
     }
-    const logoId = addObject(streamObject(`/Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode${alphaId ? ` /SMask ${alphaId} 0 R` : ''}`, logo.rgb))
 
     const pageContents = []
     let pageIndex = -1
@@ -248,7 +257,8 @@ const createOrderReceipt = (order, user = order.user) => {
     for (const commands of pageContents) {
         const stream = Buffer.from(commands.join('\n'), 'binary')
         const contentId = addObject(streamObject('', stream))
-        const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 ${regularFontId} 0 R /F2 ${boldFontId} 0 R >> /XObject << /Logo ${logoId} 0 R >> >> /Contents ${contentId} 0 R >>`)
+        const xObjectResources = logoId ? `/XObject << /Logo ${logoId} 0 R >>` : ''
+        const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 ${regularFontId} 0 R /F2 ${boldFontId} 0 R >> ${xObjectResources} >> /Contents ${contentId} 0 R >>`)
         pageIds.push(pageId)
     }
     objects[catalogId - 1] = Buffer.from(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`, 'binary')

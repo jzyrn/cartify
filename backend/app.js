@@ -7,15 +7,24 @@ const order = require('./routes/order');
 const cookieParser = require('cookie-parser')
 const { rateLimit } = require('express-rate-limit')
 
+const normalizeOrigin = value => {
+    if (!value) return null
+    try {
+        return new URL(value).origin
+    } catch {
+        return value.replace(/\/$/, '')
+    }
+}
+
 const allowedOrigins = new Set([
-    process.env.FRONTEND_URL,
+    normalizeOrigin(process.env.FRONTEND_URL),
     'http://localhost:5173',
     'http://localhost:5174',
 ].filter(Boolean))
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.has(origin)) return callback(null, true)
+        if (!origin || allowedOrigins.has(normalizeOrigin(origin))) return callback(null, true)
         return callback(new Error('This origin is not allowed by CORS'))
     },
     credentials: true,

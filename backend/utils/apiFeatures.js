@@ -43,14 +43,15 @@ class APIFeatures {
         delete queryCopy['price[gte]'];
         delete queryCopy['price[lte]'];
 
-        // exact customer rating filter
+        // Group the average rating by its nearest whole star, matching the homepage display.
         const selectedRating = queryCopy.rating ?? queryCopy['ratings[gte]'] ?? queryCopy.ratings?.gte;
         if (selectedRating !== undefined && selectedRating !== '') {
             const ratingValue = Number(selectedRating);
             if (Number.isFinite(ratingValue) && ratingValue >= 1 && ratingValue <= 5) {
-                priceFilter.ratings = ratingValue === 5
-                    ? 5
-                    : { $gte: ratingValue, $lt: ratingValue + 1 };
+                priceFilter.ratings = {
+                    $gte: Math.max(1, ratingValue - 0.5),
+                    $lt: ratingValue + 0.5,
+                };
             }
         }
         delete queryCopy.rating;
