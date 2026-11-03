@@ -48,7 +48,6 @@ export const getProducts = (currentPage = 1, keyword = '', price, category = '',
         if (brands.length) params.set('brand', brands.join(','))
         const link = `${import.meta.env.VITE_API}/products?${params.toString()}`
         const { data } = await axios.get(link)
-        console.log(data)
         dispatch({
             type: ALL_PRODUCTS_SUCCESS,
             payload: data

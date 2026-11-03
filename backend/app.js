@@ -5,11 +5,29 @@ const products = require('./routes/product');
 const authRoutes = require('./routes/auth');
 const order = require('./routes/order');
 const cookieParser = require('cookie-parser')
+const { rateLimit } = require('express-rate-limit')
 
+const allowedOrigins = new Set([
+    process.env.FRONTEND_URL,
+    'http://localhost:5173',
+    'http://localhost:5174',
+].filter(Boolean))
 
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.has(origin)) return callback(null, true)
+        return callback(new Error('This origin is not allowed by CORS'))
+    },
     credentials: true,
+}))
+// Render runs behind a proxy; trust it so IP-based rate limiting uses the client IP.
+app.set('trust proxy', 1)
+app.use('/api/v1', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 300,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests. Please try again later.' },
 }))
 // bigger limits so base64 product images don't cause 413 Payload Too Large
 app.use(express.json({ limit: '50mb' }));

@@ -1,11 +1,12 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async options => {
-    const port = Number(process.env.SMTP_PORT || 587)
+    const port = Number(process.env.SMTP_PORT || 2525)
     const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'live.smtp.mailtrap.io',
+        host: process.env.SMTP_HOST || 'sandbox.smtp.mailtrap.io',
         port,
         secure: port === 465,
+        requireTLS: port !== 465,
         auth: {
             user: process.env.SMTP_EMAIL,
             pass: process.env.SMTP_PASSWORD

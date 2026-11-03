@@ -405,7 +405,6 @@ exports.productSales = async (req, res, next) => {
 
         },
     ])
-    console.log(totalSales)
     const sales = await Order.aggregate([
         { $project: { _id: 0, "orderItems": 1, totalPrice: true } },
         { $unwind: "$orderItems" },
@@ -417,7 +416,6 @@ exports.productSales = async (req, res, next) => {
             },
         },
     ])
-    console.log(sales)
 
     if (!totalSales) {
         return res.status(404).json({
@@ -443,7 +441,6 @@ exports.productSales = async (req, res, next) => {
         }
         return total
     })
-    console.log(totalPercentage)
     res.status(200).json({
         success: true,
         totalPercentage,
